@@ -1,0 +1,31 @@
+[project]
+name = "volvo-process-mining"
+version = "0.1.0"
+description = "Process mining and LTL verification over the BPI Challenge 2013 Volvo IT logs"
+requires-python = ">=3.12"
+dependencies = [
+    "pm4py>=2.7.23",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "flloat>=0.3.0",
+    "gradio>=6.0",
+    "plotly>=6.0",
+    "graphviz>=0.20",
+    "python-dotenv>=1.0",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+ai = ["openai>=1.0", "google-genai>=1.0"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["volvo/tests"]
+pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["volvo*"]

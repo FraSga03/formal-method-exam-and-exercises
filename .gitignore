@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.env
+
+# Dataset — fetched via scripts/fetch_data.py
+data/raw/
+
+# Generated Petri net renders
+volvo/static/generated/
+
+# Dashboard-generated report
+volvo/static/report.md

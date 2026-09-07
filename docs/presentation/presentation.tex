@@ -1,0 +1,319 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{whale}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+
+\graphicspath{{../figures/}}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamerfont{frametitle}{size=\large}
+
+\newcommand{\act}[1]{\texttt{\small #1}}
+
+\title[Process Mining --- BPI 2013]{Process Mining and Formal Verification\\
+       of the Volvo IT Incident Process}
+\subtitle{BPI Challenge 2013}
+\author{Formal Methods}
+\date{\today}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}{The question}
+\begin{itemize}
+  \item An IT service desk records every state change of every incident.
+  \item The process is \emph{documented}. What was actually \emph{executed}?
+  \bigskip
+  \item Volvo IT Belgium, VINST system, 2010--2012.
+  \item Three logs: incidents, open problems, closed problems.
+  \item A standard benchmark, so the results are comparable with the literature.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The data}
+\begin{center}\small\input{../tables/dataset.tex}\end{center}
+\bigskip
+The problem logs are not variants of the incident process --- median duration
+differs by an order of magnitude.
+\end{frame}
+
+\begin{frame}{There is no activity column}
+The dataset records \act{Status} and \act{Sub Status}. What counts as an
+activity is the analyst's decision.
+\bigskip
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{\act{Status}} --- 4 activities\\[0.3em]
+\act{Accepted}, \act{Queued}, \act{Completed}, \act{Unmatched}\\[0.6em]
+Small models. Waiting on a vendor and waiting on a user become
+indistinguishable.
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{\act{Status+Sub Status}} --- 13 activities\\[0.3em]
+\act{Accepted+In Progress}, \act{Accepted+Wait - User}, \dots\\[0.6em]
+Three times larger models, lower precision, and the real process.
+\end{column}
+\end{columns}
+\bigskip
+\begin{center}
+Treated as a parameter, not fixed silently. Both are reported.
+\end{center}
+\end{frame}
+
+\begin{frame}{Three discovery algorithms}
+\begin{description}
+  \item[Alpha] Ordering relations from directly-follows pairs. Assumes a
+        complete, noise-free log. Cannot represent short loops.
+  \item[Heuristics] Frequency-weighted, with a dependency threshold. Filters
+        infrequent behaviour instead of modelling it.
+  \item[Inductive] Recursive partitioning into a process tree. Guarantees
+        soundness and, at zero noise, perfect fitness.
+\end{description}
+\end{frame}
+
+\begin{frame}{Four dimensions, not one}
+\begin{description}
+  \item[Fitness] Can the model replay what happened?
+  \item[Precision] Does it forbid what never happened?
+  \item[Generalisation] Will it hold for future cases?
+  \item[Simplicity] Can a human read it?
+\end{description}
+\bigskip
+They trade off. Maximising any one alone is trivial ---
+a model permitting everything fits perfectly and explains nothing.
+\end{frame}
+
+\begin{frame}{Discovery results}
+\begin{center}\scriptsize\input{../tables/discovery.tex}\end{center}
+\bigskip
+\small
+Inductive buys perfect fitness with permissiveness and the largest net.
+Heuristics gives the best balance. Alpha collapses.
+\end{frame}
+
+\begin{frame}{Why Alpha collapses}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+Fitness below $0.15$; the net degenerates to two places.
+\bigskip
+\textbf{This is not a bug.}
+\bigskip
+90\% of cases contain a \emph{length-one loop} --- an activity immediately
+repeated.
+\bigskip
+Alpha infers contradictory ordering relations from a directly-follows pair
+$(a,a)$ and provably cannot represent such loops.
+\bigskip
+A known theoretical boundary, demonstrated on a real log.
+\end{column}
+\begin{column}{0.43\textwidth}
+\includegraphics[width=\textwidth]{petri_alpha_status.png}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Where does the time go?}
+\includegraphics[width=\textwidth]{waiting_times.png}
+\bigskip
+The \act{Wait} states dominate. Delay is \emph{external} to the service desk.
+\end{frame}
+
+\begin{frame}{Never trust the mean alone}
+\act{Accepted+In Progress}: median waiting time in \textbf{minutes}, mean in
+\textbf{hours}.
+\bigskip
+\begin{itemize}
+  \item Work is normally picked up immediately.
+  \item Occasionally it stalls for a very long time.
+  \item The mean alone says ``slow activity''. The median alone hides the stalls.
+\end{itemize}
+\bigskip
+Both are reported everywhere in this analysis.
+\end{frame}
+
+\begin{frame}{A weakly standardised process}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\includegraphics[width=\textwidth]{variant_pareto.png}
+\end{column}
+\begin{column}{0.46\textwidth}
+Thousands of distinct variants against 7{,}554 cases.
+\bigskip
+Most variants occur exactly \emph{once}.
+\bigskip
+Consequence: any high-precision model of this log would be overfitted. The low
+precision figures are the correct result.
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Temporal logic over \emph{finite} traces}
+A case is a finite sequence of events, so the semantics are $\text{LTL}_f$.
+\bigskip
+\begin{align*}
+  \pi, i \models \mathbf{F}\varphi &\iff \exists j \geq i.\ \pi, j \models \varphi \\
+  \pi, i \models \mathbf{G}\varphi &\iff \forall j \geq i.\ \pi, j \models \varphi \\
+  \pi, i \models \mathbf{X}\varphi &\iff i+1 < n \ \textbf{and}\ \pi, i{+}1 \models \varphi
+\end{align*}
+\bigskip
+\alert{$\mathbf{X}$ is \emph{strong}: false at the last position.} Remember this
+for two slides' time.
+\end{frame}
+
+\begin{frame}{The property library}
+Eight properties, each a real formula evaluated per case.
+\bigskip
+\small
+\begin{tabular}{ll}
+\toprule
+Termination & $\mathbf{F}(\textit{completed}_*)$ \\
+Resolution & $\mathbf{G}(\textit{in\_progress} \rightarrow \mathbf{F}\,\textit{completed}_*)$ \\
+No work after closure & $\mathbf{G}(\textit{closed} \rightarrow \neg\mathbf{F}\,\textit{in\_progress})$ \\
+Queued work picked up & $\mathbf{G}(\textit{queued} \rightarrow \mathbf{F}\,\textit{in\_progress})$ \\
+\alert{Formal closure} & $\mathbf{G}(\textit{in\_progress} \rightarrow \mathbf{F}\,\textit{closed})$ \\
+\alert{Queueing precedes work} & $(\neg\,\textit{in\_progress}) \ \mathbf{U}\ \textit{queued}$ \\
+\bottomrule
+\end{tabular}
+\bigskip\normalsize
+
+The last two encode the \emph{documented} procedure. They are expected to fail.
+The size of the gap is the result.
+\end{frame}
+
+\begin{frame}{Verification results}
+\begin{center}\small\input{../tables/ltl.tex}\end{center}
+\end{frame}
+
+\begin{frame}{Finding 1 --- rework dominates}
+\begin{center}
+\Large
+Fewer than half of all events are the \emph{first} occurrence\\
+of their activity within the case.
+\end{center}
+\bigskip
+\begin{itemize}
+  \item Over half of all recorded work is repetition.
+  \item Completion is near perfect; variability is moderate.
+  \item Rework is the single component dragging the score down --- and the
+        largest available lever.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Finding 2 --- push to front}
+\begin{center}
+\Large
+$(\neg\,\textit{in\_progress}) \ \mathbf{U}\ \textit{queued}$ \quad holds for a
+small minority of cases.
+\end{center}
+\bigskip
+\begin{itemize}
+  \item The documented procedure: queue the incident, then work it.
+  \item What happens: work begins without the incident ever being queued.
+  \item Established by \emph{formal verification over every case} --- not by
+        sampling, not by eyeballing variants.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Two methods, one conclusion}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Verification}\\[0.4em]
+$\mathbf{G}(\textit{closed} \rightarrow \neg\mathbf{F}\,\textit{in\_progress})$
+fails for a set of cases: work resumes after formal closure.
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Performance}\\[0.4em]
+\act{Completed+Closed} appears in the waiting-time table at all --- meaning
+closure events that were \emph{not} the last event of their case.
+\end{column}
+\end{columns}
+\bigskip\bigskip
+\begin{center}
+Independent methods agreeing is stronger than either alone.
+\end{center}
+\end{frame}
+
+\begin{frame}{The strong-\texorpdfstring{$\mathbf{X}$}{X} trap}
+Written the natural infinite-trace way:
+\[
+  \mathbf{G}(\textit{closed} \rightarrow \mathbf{X}\,\mathbf{G}\,\neg\,\textit{in\_progress})
+  \quad\Longrightarrow\quad \alert{26.2\%}
+\]
+Written without the next operator:
+\[
+  \mathbf{G}(\textit{closed} \rightarrow \neg\mathbf{F}\,\textit{in\_progress})
+  \quad\Longrightarrow\quad \textbf{98.4\%}
+\]
+\bigskip
+Most cases \emph{end} with \act{Completed+Closed}. $\mathbf{X}$ is false there,
+so every such case falsifies the first formula for reasons having nothing to do
+with Volvo IT.
+\bigskip
+\begin{center}
+A factor of four apart. Only one of them is about the process.
+\end{center}
+\end{frame}
+
+\begin{frame}{Implementation}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Four stateless layers}
+\begin{description}
+  \item[Loading] every source attribute retained
+  \item[Mining] discovery, conformance
+  \item[Verification] $\text{LTL}_f$ per trace
+  \item[Analysis] time, variants, anomalies
+\end{description}
+\end{column}
+\begin{column}{0.46\textwidth}
+\textbf{Consequences}
+\begin{itemize}
+  \item Testable without a web server
+  \item Regression tests pin every figure shown today
+  \item Interactive dashboard over the same functions
+  \item Every table and figure generated from code
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Threats to validity}
+\begin{itemize}
+  \item Conformance is computed on a \emph{sample}; alignment-based computation
+        does not scale to the full log.
+  \item Token-based replay is optimistic on unsound nets.
+  \item The composite score's weights are \emph{stipulated}. Components are
+        meaningful; the aggregate only comparatively.
+  \item \act{Unmatched+Unmatched} is an export artefact, not work.
+  \item We observe what was \emph{recorded}. Poor recording discipline looks
+        like rework.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusions}
+\begin{enumerate}
+  \item \textbf{Rework dominates} --- over half of recorded work is repetition.
+  \item \textbf{Documented $\neq$ executed} --- push-to-front proved formally
+        over every case.
+  \item \textbf{Alpha is inapplicable here} --- predicted by length-one loops,
+        not an empirical surprise.
+\end{enumerate}
+\bigskip
+\textbf{Next:} the organisational attributes are already loaded --- handover
+analysis across support lines, and incident versus problem as interacting
+processes.
+\end{frame}
+
+\begin{frame}[plain]
+\begin{center}
+\Huge Questions
+\end{center}
+\end{frame}
+
+\end{document}
