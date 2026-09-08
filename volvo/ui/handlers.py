@@ -119,7 +119,7 @@ def run_ltl(bundle, formula: str, max_counterexamples: int):
     if require_bundle(bundle):
         return NO_LOG, pd.DataFrame()
 
-    result = verify(bundle, formula, max_counterexamples=int(max_counterexamples), strict=False)
+    result = verify(bundle, formula, max_counterexamples=int(max_counterexamples))
     if result.error:
         return f"**Error:** {result.error}", pd.DataFrame()
 

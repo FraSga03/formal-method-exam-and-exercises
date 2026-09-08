@@ -105,6 +105,20 @@ def test_run_ltl_reports_a_bad_formula_without_raising():
     assert table.empty
 
 
+def test_run_ltl_rejects_a_misspelled_proposition():
+    text, table = handlers.run_ltl(build({"1": "PC"}), "F(accepted_in_progres)", 5)
+
+    assert text.startswith("**Error:**")
+    assert table.empty
+
+
+def test_run_ltl_accepts_a_valid_activity_absent_from_the_log():
+    text, table = handlers.run_ltl(build({"1": "PC"}), "F(accepted_assigned)", 5)
+
+    assert not text.startswith("**Error:**")
+    assert "0" in text
+
+
 def test_property_choices_match_the_library():
     from volvo.verification.patterns import PROPERTIES
 
