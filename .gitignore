@@ -19,3 +19,13 @@ exercises/fsm/reviews.json
 
 # latexmk build log
 docs/presentation/presentation.fdb_latexmk
+
+# LaTeX build artefacts — the .tex sources and the built .pdf are the deliverables
+docs/**/*.aux
+docs/**/*.fdb_latexmk
+docs/**/*.fls
+docs/**/*.log
+docs/**/*.nav
+docs/**/*.out
+docs/**/*.snm
+docs/**/*.toc
