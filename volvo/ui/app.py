@@ -1,11 +1,13 @@
 """Dashboard wiring. All logic lives in handlers.py."""
+from typing import get_args
+
 import gradio as gr
 
-from volvo.domain import DEFAULT_ACTIVITY_MODE
+from volvo.domain import DEFAULT_ACTIVITY_MODE, ActivityMode
 from volvo.mining.discovery import ALGORITHMS
 from volvo.ui import handlers
 
-MODES = ["status", "substatus", "status_substatus"]
+MODES = list(get_args(ActivityMode))
 TITLE = "Volvo IT Process Mining"
 
 

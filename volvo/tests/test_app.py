@@ -38,3 +38,16 @@ def test_app_loads_a_log_at_startup():
     triggers = {trigger for fn in demo.fns.values() for _, trigger in fn.targets}
 
     assert "load" in triggers
+
+
+def test_every_activity_mode_is_offered():
+    from typing import get_args
+
+    from volvo.domain import ActivityMode
+    from volvo.ui.app import MODES
+
+    radios = [b for b in build().blocks.values() if isinstance(b, gr.Radio)]
+    offered = {choice for radio in radios for choice, _ in radio.choices}
+
+    assert set(MODES) == set(get_args(ActivityMode))
+    assert set(get_args(ActivityMode)) <= offered
