@@ -63,3 +63,13 @@ def test_verify_all_returns_one_row_per_applicable_property():
     for row in rows:
         assert row["error"] is None
         assert 0.0 <= row["ratio"] <= 1.0
+
+
+def test_propositions_are_the_formulas_atoms_only():
+    """Operators are uppercase, so they never enter the set in the first place."""
+    from volvo.verification.ltl import propositions_in
+
+    operators = {"G", "F", "X", "U"}
+    for prop in PROPERTIES:
+        assert prop.propositions() == propositions_in(prop.formula)
+        assert not prop.propositions() & operators

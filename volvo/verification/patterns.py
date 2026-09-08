@@ -3,13 +3,10 @@
 Each is a real formula evaluated by the same engine as user-written ones -- no
 canned code paths behind a label.
 """
-import re
 from dataclasses import dataclass
 
 from volvo.logs.loader import EventLogBundle
-from volvo.verification.ltl import Alphabet, verify
-
-_OPERATORS = {"G", "F", "X", "U"}
+from volvo.verification.ltl import Alphabet, propositions_in, verify
 
 
 @dataclass(frozen=True)
@@ -21,8 +18,7 @@ class Property:
     expected: float  # measured on the incidents log; guards against regressions
 
     def propositions(self) -> set[str]:
-        used = set(re.findall(r"\b[a-z_][a-z0-9_]*\b", self.formula))
-        return used - _OPERATORS
+        return propositions_in(self.formula)
 
 
 PROPERTIES: tuple[Property, ...] = (
