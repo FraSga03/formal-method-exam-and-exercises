@@ -12,7 +12,7 @@ STEPS = [
     ([sys.executable, "scripts/run_report.py"], "reports"),
     ([sys.executable, "scripts/build_figures.py"], "figures"),
     ([sys.executable, "scripts/build_tables.py"], "tables"),
-    (["latexmk", "-pdf", "-interaction=nonstopmode", "-cd", "docs/report/report.tex"], "report PDF"),
+    (["latexmk", "-pdf", "-interaction=nonstopmode", "-cd", "docs/report/documentation.tex"], "documentation PDF"),
     (["latexmk", "-pdf", "-interaction=nonstopmode", "-cd",
       "docs/presentation/presentation.tex"], "presentation PDF"),
 ]

@@ -153,14 +153,14 @@ orthogonal regions and the events that drive them.
 | `scripts/` | Fetch the data; regenerate every result, figure, table and PDF |
 | `docs/results/` | Measured results for the write-up |
 
-How it fits together is documented in the report: `docs/report/report.pdf`,
+How it fits together is documented in the report: `docs/report/documentation.pdf`,
 section *Implementation*.
 
 pm4py is AGPL v3.
 
 ## Deliverables
 
-`docs/report/report.pdf` and `docs/presentation/presentation.pdf`.
+`docs/report/documentation.pdf` and `docs/presentation/presentation.pdf`.
 
 Every table and figure in both is generated from the analysis code — no measured
 value is transcribed by hand, so the documents cannot drift from the results.
