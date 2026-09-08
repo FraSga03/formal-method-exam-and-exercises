@@ -17,6 +17,8 @@ def _empty(title: str) -> go.Figure:
 
 def activity_frequency(bundle: EventLogBundle) -> go.Figure:
     counts = bundle.df[ACTIVITY].value_counts().sort_values()
+    if counts.empty:
+        return _empty("Activity frequency")
     return px.bar(
         x=counts.values, y=counts.index, orientation="h",
         labels={"x": "Events", "y": "Activity"}, title="Activity frequency",
@@ -40,6 +42,8 @@ def waiting_time_bar(bundle: EventLogBundle, top: int = 10) -> go.Figure:
 
 def duration_histogram(bundle: EventLogBundle) -> go.Figure:
     durations = case_durations(bundle)
+    if durations.empty:
+        return _empty("Case duration distribution")
     return px.histogram(
         x=durations.values, nbins=50,
         labels={"x": "Case duration (hours)"}, title="Case duration distribution",

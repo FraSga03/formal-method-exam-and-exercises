@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pandas as pd
 import plotly.graph_objects as go
 import pytest
@@ -39,6 +41,22 @@ def test_load_log_rejects_an_unknown_name():
 )
 def test_every_chart_returns_a_figure(builder):
     assert isinstance(builder(build({"1": "PQC", "2": "PC"})), go.Figure)
+
+
+@pytest.mark.parametrize(
+    "builder",
+    [
+        charts.activity_frequency,
+        charts.waiting_time_bar,
+        charts.duration_histogram,
+        charts.transition_heatmap,
+    ],
+)
+def test_every_chart_survives_an_empty_log(builder):
+    bundle = build({"1": "PQC"})
+    empty = replace(bundle, df=bundle.df.iloc[0:0])
+
+    assert isinstance(builder(empty), go.Figure)
 
 
 def test_charts_survive_a_single_event_log():
