@@ -19,6 +19,9 @@ from volvo.config import (
 )
 
 
+OPENAI_MODEL = "gpt-4o-mini"
+
+
 class ProviderUnavailable(Exception):
     """Raised when a provider's SDK, key or server is missing at call time."""
 
@@ -103,7 +106,7 @@ def _build(name: str):
         )
     if name == "openai":
         return OpenAICompatibleProvider(
-            api_key=OPENAI_API_KEY, model="gpt-4o-mini", name="openai"
+            api_key=OPENAI_API_KEY, model=OPENAI_MODEL, name="openai"
         )
     if name == "gemini":
         return GeminiProvider(api_key=GEMINI_API_KEY)
@@ -141,6 +144,6 @@ def describe(name: str) -> str:
     """One line for the UI, so the user knows what picking this costs."""
     return {
         "ollama": f"local {OLLAMA_MODEL}, free, first call is slow while the model loads",
-        "openai": "hosted gpt-4o-mini, billed to your OpenAI account",
-        "gemini": "hosted gemini-2.5-flash, free tier available",
+        "openai": f"hosted {OPENAI_MODEL}, billed to your OpenAI account",
+        "gemini": f"hosted {GEMINI_MODEL}, free tier available",
     }.get(name, name)

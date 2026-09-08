@@ -148,3 +148,11 @@ def test_gemini_model_is_configurable():
     assert providers.GeminiProvider(api_key="x", model="gemini-flash-latest").model == (
         "gemini-flash-latest"
     )
+
+
+def test_describe_names_the_model_that_will_actually_be_called():
+    from volvo import config
+
+    assert config.GEMINI_MODEL in providers.describe("gemini")
+    assert providers.GeminiProvider(api_key="x").model in providers.describe("gemini")
+    assert providers._build("openai").model in providers.describe("openai")
