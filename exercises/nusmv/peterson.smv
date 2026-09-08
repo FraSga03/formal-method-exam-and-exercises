@@ -1,0 +1,77 @@
+-- Peterson's mutual exclusion algorithm for two processes.
+--
+-- Each process runs:  flag[i] := TRUE ; turn := 1-i ; await !flag[1-i] | turn = i
+--                     ... critical section ... ; flag[i] := FALSE
+
+MODULE main
+
+FROZENVAR
+    BUGGY : boolean;            -- drop the turn test from the entry guard
+
+VAR
+    pc0   : { idle, want, wait, crit };
+    pc1   : { idle, want, wait, crit };
+    flag0 : boolean;
+    flag1 : boolean;
+    turn  : 0..1;
+    sched : 0..1;               -- unconstrained: the scheduler picks freely
+
+DEFINE
+    go0   := BUGGY ? !flag1 : (!flag1 | turn = 0);
+    go1   := BUGGY ? !flag0 : (!flag0 | turn = 1);
+
+    -- idle -> want is optional: a process may sit outside the protocol forever.
+    step0 :=
+      case
+        pc0 = idle : ((next(pc0) = want & next(flag0) = TRUE) |
+                      (next(pc0) = idle & next(flag0) = flag0)) & next(turn) = turn;
+        pc0 = want : next(pc0) = wait & next(flag0) = flag0 & next(turn) = 1;
+        pc0 = wait : next(pc0) = (go0 ? crit : wait) & next(flag0) = flag0 & next(turn) = turn;
+        pc0 = crit : next(pc0) = idle & next(flag0) = FALSE & next(turn) = turn;
+      esac;
+
+    step1 :=
+      case
+        pc1 = idle : ((next(pc1) = want & next(flag1) = TRUE) |
+                      (next(pc1) = idle & next(flag1) = flag1)) & next(turn) = turn;
+        pc1 = want : next(pc1) = wait & next(flag1) = flag1 & next(turn) = 0;
+        pc1 = wait : next(pc1) = (go1 ? crit : wait) & next(flag1) = flag1 & next(turn) = turn;
+        pc1 = crit : next(pc1) = idle & next(flag1) = FALSE & next(turn) = turn;
+      esac;
+
+    stutter0 := next(pc0) = pc0 & next(flag0) = flag0;
+    stutter1 := next(pc1) = pc1 & next(flag1) = flag1;
+
+INIT
+    pc0 = idle & pc1 = idle & flag0 = FALSE & flag1 = FALSE & turn = 0;
+
+-- Interleaving through an explicit scheduler: `process` is deprecated in NuSMV
+-- and gone from nuXmv.
+TRANS
+  case
+    sched = 0 : step0 & stutter1;
+    sched = 1 : step1 & stutter0;
+  esac;
+
+-- Neither process is starved by the scheduler.
+FAIRNESS sched = 0;
+FAIRNESS sched = 1;
+
+-- TRUE.
+INVARSPEC
+    !(pc0 = crit & pc1 = crit);
+
+-- TRUE.
+LTLSPEC
+    !BUGGY -> G (pc0 = want -> F pc0 = crit);
+
+LTLSPEC
+    !BUGGY -> G (pc1 = want -> F pc1 = crit);
+
+-- TRUE.
+CTLSPEC
+    !BUGGY -> AG EF pc0 = crit;
+
+-- TRUE.
+CTLSPEC
+    BUGGY -> EF AG !(pc0 = crit);

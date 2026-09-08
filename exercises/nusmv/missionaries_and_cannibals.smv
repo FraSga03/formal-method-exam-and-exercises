@@ -1,0 +1,65 @@
+-- Three missionaries and three cannibals must cross a river in a boat that
+-- carries one or two people.  Cannibals may never outnumber missionaries on
+-- either bank.  The solution is read off the counterexample to `!EF goal`.
+
+MODULE main
+
+VAR
+    ML   : 0..3;                -- missionaries on the left bank
+    CL   : 0..3;                -- cannibals on the left bank
+    BOAT : { left, right };
+
+DEFINE
+    MR   := 3 - ML;
+    CR   := 3 - CL;
+
+    safe := (ML = 0 | ML >= CL) & (MR = 0 | MR >= CR);
+
+    -- Everyone across, boat included: without the boat clause the model
+    -- accepts a state that no sequence of crossings can actually produce.
+    goal := ML = 0 & CL = 0 & BOAT = right;
+
+    start := ML = 3 & CL = 3 & BOAT = left;
+
+INIT
+    start;
+
+INVAR
+    safe;
+
+TRANS
+  case
+    -- FROM LEFT TO RIGHT
+    BOAT = left : (
+        (ML >= 1 & next(ML) = ML - 1 & next(CL) = CL     & next(BOAT) = right) |            -- ONE MISSIONARY
+        (ML >= 2 & next(ML) = ML - 2 & next(CL) = CL     & next(BOAT) = right) |            -- TWO MISSIONARIES
+        (CL >= 1 & next(ML) = ML     & next(CL) = CL - 1 & next(BOAT) = right) |            -- ONE CANNIBAL
+        (CL >= 2 & next(ML) = ML     & next(CL) = CL - 2 & next(BOAT) = right) |            -- TWO CANNIBALS
+        (ML >= 1 & CL >= 1 & next(ML) = ML - 1 & next(CL) = CL - 1 & next(BOAT) = right)    -- ONE OF EACH
+    );
+
+    -- FROM RIGHT TO LEFT
+    BOAT = right : (
+        (MR >= 1 & next(ML) = ML + 1 & next(CL) = CL     & next(BOAT) = left) |             -- ONE MISSIONARY
+        (MR >= 2 & next(ML) = ML + 2 & next(CL) = CL     & next(BOAT) = left) |             -- TWO MISSIONARIES
+        (CR >= 1 & next(ML) = ML     & next(CL) = CL + 1 & next(BOAT) = left) |             -- ONE CANNIBAL
+        (CR >= 2 & next(ML) = ML     & next(CL) = CL + 2 & next(BOAT) = left) |             -- TWO CANNIBALS
+        (MR >= 1 & CR >= 1 & next(ML) = ML + 1 & next(CL) = CL + 1 & next(BOAT) = left)     -- ONE OF EACH
+    );
+  esac;
+
+-- Vacuous restatement: INVAR safe already restricts every reachable state.
+INVARSPEC
+    safe;
+
+-- FALSE.  The counterexample is the eleven-crossing solution.
+CTLSPEC
+    !EF goal;
+
+-- TRUE.  No safe state is a dead end.
+CTLSPEC
+    AG EF goal;
+
+-- TRUE.  Every crossing is reversible, so the state graph is undirected.
+CTLSPEC
+    AG EF start;

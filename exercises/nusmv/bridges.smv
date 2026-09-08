@@ -1,0 +1,109 @@
+-- The seven bridges of Konigsberg.  A walk crosses each bridge at most once;
+-- B8 is an eighth bridge, present or not, that makes the walk possible.
+
+MODULE main
+
+FROZENVAR
+    B8_PRESENT      : boolean;          -- the eighth bridge, B <-> C, exists
+
+VAR
+    LOCATION        : { lA, lB, lC, lD };
+    B1              : boolean;          -- C <-> A
+    B2              : boolean;          -- C <-> A
+    B3              : boolean;          -- A <-> B
+    B4              : boolean;          -- A <-> B
+    B5              : boolean;          -- B <-> D
+    B6              : boolean;          -- C <-> D
+    B7              : boolean;          -- A <-> D
+    B8              : boolean;          -- B <-> C, only when B8_PRESENT
+
+DEFINE
+    s1 := next(B1) = B1;
+    s2 := next(B2) = B2;
+    s3 := next(B3) = B3;
+    s4 := next(B4) = B4;
+    s5 := next(B5) = B5;
+    s6 := next(B6) = B6;
+    s7 := next(B7) = B7;
+    s8 := next(B8) = B8;
+
+    crossed := (B1 ? 1 : 0) + (B2 ? 1 : 0) + (B3 ? 1 : 0) + (B4 ? 1 : 0)
+             + (B5 ? 1 : 0) + (B6 ? 1 : 0) + (B7 ? 1 : 0) + (B8 ? 1 : 0);
+
+    all_crossed := B1 & B2 & B3 & B4 & B5 & B6 & B7 & (B8_PRESENT -> B8);
+
+INIT
+    (LOCATION = lA | LOCATION = lB | LOCATION = lC | LOCATION = lD) &
+    B1 = FALSE & B2 = FALSE & B3 = FALSE & B4 = FALSE &
+    B5 = FALSE & B6 = FALSE & B7 = FALSE & B8 = FALSE;
+
+-- A bridge that is not there is never crossed.
+INVAR
+    !B8_PRESENT -> !B8;
+
+TRANS
+  case
+    -- guarded: an unguarded LOCATION = lX makes the stop case below dead and deadlocks
+    LOCATION = lA & (!B1 | !B2 | !B3 | !B4 | !B7) : (
+        (!B3 & next(LOCATION) = lB & next(B3) = TRUE & s1 & s2 & s4 & s5 & s6 & s7 & s8) |
+        (!B4 & next(LOCATION) = lB & next(B4) = TRUE & s1 & s2 & s3 & s5 & s6 & s7 & s8) |
+
+        (!B1 & next(LOCATION) = lC & next(B1) = TRUE & s2 & s3 & s4 & s5 & s6 & s7 & s8) |
+        (!B2 & next(LOCATION) = lC & next(B2) = TRUE & s1 & s3 & s4 & s5 & s6 & s7 & s8) |
+
+        (!B7 & next(LOCATION) = lD & next(B7) = TRUE & s1 & s2 & s3 & s4 & s5 & s6 & s8)
+    );
+
+    LOCATION = lB & (!B3 | !B4 | !B5 | (B8_PRESENT & !B8)) : (
+        (!B3 & next(LOCATION) = lA & next(B3) = TRUE & s1 & s2 & s4 & s5 & s6 & s7 & s8) |
+        (!B4 & next(LOCATION) = lA & next(B4) = TRUE & s1 & s2 & s3 & s5 & s6 & s7 & s8) |
+
+        (!B5 & next(LOCATION) = lD & next(B5) = TRUE & s1 & s2 & s3 & s4 & s6 & s7 & s8) |
+
+        (B8_PRESENT & !B8 & next(LOCATION) = lC & next(B8) = TRUE & s1 & s2 & s3 & s4 & s5 & s6 & s7)
+    );
+
+    LOCATION = lC & (!B1 | !B2 | !B6 | (B8_PRESENT & !B8)) : (
+        (!B1 & next(LOCATION) = lA & next(B1) = TRUE & s2 & s3 & s4 & s5 & s6 & s7 & s8) |
+        (!B2 & next(LOCATION) = lA & next(B2) = TRUE & s1 & s3 & s4 & s5 & s6 & s7 & s8) |
+
+        (!B6 & next(LOCATION) = lD & next(B6) = TRUE & s1 & s2 & s3 & s4 & s5 & s7 & s8) |
+
+        (B8_PRESENT & !B8 & next(LOCATION) = lB & next(B8) = TRUE & s1 & s2 & s3 & s4 & s5 & s6 & s7)
+    );
+
+    LOCATION = lD & (!B5 | !B6 | !B7) : (
+        (!B5 & next(LOCATION) = lB & next(B5) = TRUE & s1 & s2 & s3 & s4 & s6 & s7 & s8) |
+
+        (!B6 & next(LOCATION) = lC & next(B6) = TRUE & s1 & s2 & s3 & s4 & s5 & s7 & s8) |
+
+        (!B7 & next(LOCATION) = lA & next(B7) = TRUE & s1 & s2 & s3 & s4 & s5 & s6 & s8)
+    );
+
+    -- Every bridge from here is already crossed: the walk stops.
+    TRUE : (next(LOCATION) = LOCATION & s1 & s2 & s3 & s4 & s5 & s6 & s7 & s8);
+  esac;
+
+INVARSPEC
+    crossed <= (B8_PRESENT ? 8 : 7);
+
+-- TRUE.  Euler: A, B, C and D all have odd degree, so no walk crosses all
+-- seven bridges once.
+CTLSPEC
+    !B8_PRESENT -> !EF all_crossed;
+
+-- TRUE.  Six of the seven is the best a walk can do.
+CTLSPEC
+    !B8_PRESENT -> EF (crossed = 6);
+
+-- TRUE, but only from an odd-degree vertex: CTLSPEC binds over every initial state.
+CTLSPEC
+    B8_PRESENT -> ((LOCATION = lA | LOCATION = lD) -> EF all_crossed);
+
+-- TRUE: the even-degree vertices B and C cannot complete the trail.
+CTLSPEC
+    B8_PRESENT -> ((LOCATION = lB | LOCATION = lC) -> !EF all_crossed);
+
+-- FALSE when B8 is present; stated as a negation to get the counterexample walk.
+CTLSPEC
+    !(B8_PRESENT & EF all_crossed);
