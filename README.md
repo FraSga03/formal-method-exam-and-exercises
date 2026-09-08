@@ -165,15 +165,18 @@ pm4py is AGPL v3.
 Every table and figure in both is generated from the analysis code — no measured
 value is transcribed by hand, so the documents cannot drift from the results.
 
-Rebuild everything from scratch:
+Rebuild the figures, tables and PDFs:
 
 ```bash
 uv run python scripts/build_all.py
 ```
 
-That runs the baseline, verification, analytics and report scripts, regenerates
-`docs/figures/` and `docs/tables/`, then builds both PDFs. It needs a LaTeX
-toolchain:
+That regenerates `docs/figures/` and `docs/tables/`, then builds both PDFs. It
+does not refresh `docs/results/*.md` — those scripts only print to stdout, and
+`discovery-baseline.md` carries a hand-written preamble that a naive redirect
+would clobber. Refresh them individually, e.g.
+`uv run python scripts/run_verification.py > docs/results/ltl-verification.md`.
+It needs a LaTeX toolchain:
 
 ```bash
 sudo apt install texlive-latex-recommended texlive-fonts-recommended latexmk
