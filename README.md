@@ -21,9 +21,14 @@ uv run pytest volvo/tests -v
 
 ```bash
 uv run python -m volvo.main
+uv run python -m volvo.main --openai-api-key sk-...   # or --gemini-api-key, --ollama-base-url
+uv run python -m volvo.main --host 0.0.0.0 --port 8080
 ```
 
 Then open http://127.0.0.1:7860.
+
+Keys are read from `.env` and the environment as before; the flags override both,
+which is the way to run it without writing a key to disk.
 
 ## Scripts
 
@@ -72,6 +77,16 @@ column, and the choice of mode materially changes the discovered model.
 | Incidents | 7,554 | 65,533 | 13 |
 | Open problems | 819 | 2,351 | 5 |
 | Closed problems | 1,487 | 6,660 | 7 |
+
+## Exercises
+
+Smaller formal-methods exercises live under `exercises/`, each self-contained with its own README.
+
+| Path | Role |
+|---|---|
+| `exercises/nusmv/` | Three verified SMV models — run `./exercises/nusmv/check.sh` |
+| `exercises/fsm/` | Movie review state machine |
+| `exercises/itemis/` | Smart kitchen statechart |
 
 ## Layout
 
