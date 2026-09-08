@@ -13,3 +13,9 @@ volvo/static/generated/
 
 # Dashboard-generated report
 volvo/static/report.md
+
+# FSM exercise session data
+exercises/fsm/reviews.json
+
+# latexmk build log
+docs/presentation/presentation.fdb_latexmk
