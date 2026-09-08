@@ -140,11 +140,21 @@ orthogonal regions and the events that drive them.
 
 | Path | Role |
 |---|---|
-| `volvo/domain.py` | Declared log schemas and activity-label derivation |
-| `volvo/logs/` | Attribute-preserving loading into an `EventLogBundle` |
-| `volvo/mining/` | Discovery, conformance, algorithm comparison |
 | `volvo/config.py` | Paths and API keys — no domain knowledge |
+| `volvo/domain.py` | Declared log schemas and activity-label derivation |
+| `volvo/logs/` | Attribute-preserving loading into an `EventLogBundle`, and filters |
+| `volvo/mining/` | Discovery, conformance, algorithm comparison, performance |
+| `volvo/verification/` | LTLf encoding and evaluation, and the shipped property library |
+| `volvo/analysis/` | Composite score, anomalies, Markov transition model |
+| `volvo/ai/` | LLM providers and the fact block the assistant is grounded in |
+| `volvo/ui/` | Gradio layout, callbacks, Plotly figures |
+| `volvo/reporting/` | Markdown report generation |
+| `volvo/main.py` | Command-line entry point |
+| `scripts/` | Fetch the data; regenerate every result, figure, table and PDF |
 | `docs/results/` | Measured results for the write-up |
+
+How it fits together is documented in the report: `docs/report/report.pdf`,
+section *Implementation*.
 
 pm4py is AGPL v3.
 

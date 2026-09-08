@@ -480,30 +480,193 @@ work resumed after closure, and thousands of one-off variants.
 
 \section{Implementation}\label{sec:architecture}
 
-The analysis is implemented as a Python package organised in four layers.
+\subsection{Technology stack}
 
-\begin{description}
-  \item[Loading] Parses either distributed form of the dataset, derives the
-        activity label according to the selected mode, and retains every source
-        attribute. Reducing events to the three XES-standard columns, as is
-        common, would discard the organisational data on which any extension of
-        this work depends.
-  \item[Mining] Discovery, conformance and algorithm comparison.
-  \item[Verification] Activity-to-proposition encoding, $\text{LTL}_f$
-        evaluation per trace, and counterexample extraction.
-  \item[Analysis] Waiting times, durations, variants, statistical anomalies, a
-        first-order Markov transition model and the composite score.
-\end{description}
+The analysis is a single self-contained Python package. Dependencies are
+declared in \texttt{pyproject.toml} and resolved with \texttt{uv}; the versions
+in Table~\ref{tab:stack} are those the reported results were produced with.
 
-Every analysis function is stateless: it takes a loaded log and returns a value,
-holding no module-level state. A browser-based dashboard presents the layers
-interactively, holding the loaded log in per-session state, and a report
-generator produces documents of this kind from the same functions. The
-statelessness is what makes the analysis testable without a web server; the
-suite comprises well over a hundred tests, including regression tests that pin
-the measured figures reported here.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llp{7.2cm}}
+\toprule
+Component & Version & Role \\
+\midrule
+Python        & 3.12    & Language runtime \\
+uv            & 0.11    & Dependency resolution and virtual environment \\
+pm4py         & 2.7.23  & XES parsing, the three discovery algorithms, conformance metrics, Petri net rendering \\
+flloat        & 0.3.0   & $\text{LTL}_f$ parsing and evaluation over finite traces \\
+Graphviz      & 2.43    & External renderer invoked by pm4py for the Petri net figures \\
+pandas        & 3.0     & The event table underlying every analysis \\
+Gradio        & 6.26    & Browser dashboard \\
+Plotly        & 7.0     & Interactive figures in the dashboard \\
+Matplotlib    & 3.11    & Static figures for this report \\
+pytest        & 9.1     & Test suite \\
+\bottomrule
+\end{tabular}
+\caption{Technology stack.}
+\label{tab:stack}
+\end{table}
 
-All tables and figures in this report are generated from the analysis code. No
+Two dependencies are optional extras rather than requirements. The \texttt{ai}
+extra carries the language model clients; the software runs, and its tests pass,
+without it installed, because those imports occur inside the functions that use
+them.
+
+\subsection{Module organisation}
+
+\begin{lstlisting}
+volvo/
+  config.py            paths and API keys read from the environment; no domain knowledge
+  domain.py            log schemas, activity-label derivation, the VINST alphabet
+  main.py              command-line entry point
+  logs/
+    loader.py          EventLogBundle, schema detection, normalisation
+    preprocessing.py   filters and relabelling; each returns a new bundle
+  mining/
+    discovery.py       discover(): Alpha, Heuristics, Inductive -> DiscoveryResult
+    conformance.py     evaluate(): fitness, precision, generalisation, simplicity
+    comparison.py      compare_algorithms(): one scored row per algorithm
+    performance.py     waiting times, case durations, trace variants
+  verification/
+    ltl.py             Alphabet, trace encoding, verify()
+    patterns.py        the eight named properties and their formulas
+  analysis/
+    health.py          composite score and threshold-triggered insights
+    anomalies.py       outlier lengths, rare activities, long waits, rare transitions
+    predictor.py       MarkovModel: first-order transition probabilities
+  ai/
+    providers.py       provider protocol, availability probing, selection order
+    assistant.py       fact block assembled from the loaded log, and the prompt
+  ui/
+    app.py             Gradio layout and event wiring only
+    handlers.py        every callback, as plain functions with no Gradio import
+    charts.py          Plotly figures
+  reporting/
+    report.py          collect facts, render Markdown, optional narrative section
+  tests/               202 tests over the above
+scripts/
+  fetch_data.py        resolves the three logs through the figshare API
+  run_baseline.py      algorithm comparison, once per labelling mode
+  run_verification.py  the property library against the incident log
+  run_analytics.py     performance, anomalies and score for every log
+  run_report.py        one generated report per log
+  build_figures.py     docs/figures/*.png
+  build_tables.py      docs/tables/*.tex
+  build_all.py         runs the above in dependency order, then both documents
+\end{lstlisting}
+
+The dependency direction is strictly downward: \texttt{ui} and
+\texttt{reporting} and \texttt{scripts} depend on the analysis packages, the
+analysis packages depend on \texttt{logs} and \texttt{domain}, and nothing
+depends on \texttt{ui}.
+
+\subsection{The loaded log}
+
+\texttt{logs.loader.load} dispatches on the file extension, detects the schema
+by matching the declared column triples in \texttt{domain.py} against the
+columns actually present, and returns an \texttt{EventLogBundle}: the pm4py
+\texttt{EventLog}, the full source frame, the schema, the labelling mode and the
+source filename.
+
+Normalisation \emph{adds} the four XES-standard columns
+(\texttt{case:concept:name}, \texttt{concept:name}, \texttt{time:timestamp} and,
+where declared, \texttt{org:resource}) to a copy of the raw frame. No column is
+dropped. Reducing each event to the three standard columns, as is common, would
+discard the support-line, ownership and country attributes that
+Section~\ref{sec:threats} identifies as the basis of any continuation of this
+work; these attributes have no XES-standard name and would be unrecoverable
+without reparsing.
+
+The activity label is computed here, by \texttt{domain.derive\_activity}, from
+the \act{Status} and \act{Sub Status} pair under one of three modes
+(\texttt{status}, \texttt{substatus}, \texttt{status\_substatus}). The mode is a
+parameter of \texttt{load} and is then frozen into the bundle. This is the
+single point at which the modelling decision of Section~\ref{sec:mode} enters
+the system, which is what allows the same log to be loaded twice under different
+labellings and the two discovered models compared directly, as
+Table~\ref{tab:discovery} does.
+
+Preprocessing steps are functions from bundle to bundle. A step that would leave
+no events raises rather than returning an empty log.
+
+\subsection{Verification}
+
+Activity labels such as \act{Accepted+In Progress} are not valid proposition
+symbols. \texttt{verification.ltl.Alphabet} therefore builds a bidirectional map
+between the labels of a given log and identifiers derived from them
+(\act{Accepted+In Progress} becomes \texttt{accepted\_in\_progress}), resolving
+any collision with a numeric suffix.
+
+Each case is one finite word. \texttt{encode\_trace} converts a case's activity
+sequence into one propositional interpretation per position, with every symbol
+of the alphabet assigned a truth value; flloat requires a total assignment at
+each position rather than the set of true symbols. A formula parsed by
+\texttt{LTLfParser} is then evaluated at position zero of each encoded trace,
+and the case is counted as satisfying or violating. Violating cases are retained
+as counterexamples up to a bound, which is where the traces quoted in
+Section~\ref{sec:verification} come from.
+
+Symbols named in a formula that the current log does not contain are padded to
+false at every position, so a property may be evaluated against a log with a
+smaller alphabet. Strict parsing additionally rejects a symbol that names no
+activity anywhere in the dataset, which distinguishes an activity that is
+genuinely absent from a mistyped one.
+
+The eight properties are declared as data --- key, name, description, formula
+and the ratio measured on the incident log --- and are evaluated by the same
+function that evaluates a formula typed into the dashboard. There is no separate
+code path behind a named property. The recorded ratios are asserted by the test
+suite, so a change in the analysis that moved any published figure would fail
+the build rather than silently update the report.
+
+\subsection{AI-assisted analysis}
+
+The dashboard can pass a block of measured facts to a language model and ask it
+to answer questions about them or to write a narrative section for a generated
+report. The block is assembled by \texttt{ai.assistant.context}: counts, the
+composite score and its components, duration quantiles, variant statistics, the
+slowest activities and the verification verdicts. The prompt instructs the model
+to use only those facts and to quote figures exactly. This is the only component
+whose output is not reproducible, and no figure in this report originates from
+it.
+
+Three providers are supported behind a single protocol: a local Ollama server
+and the two hosted APIs. Availability is probed rather than assumed --- a
+provider is offered only if both its client library and its key or server are
+present, and the local provider is preferred, so automatic selection never
+incurs a charge. With nothing configured the provider list is empty, the
+dashboard's provider selector reads \texttt{none}, and the report generator
+omits the narrative section; every other feature is unaffected.
+
+One implementation constraint is worth recording, because violating it fails
+silently. \texttt{config.py} reads the API keys from the environment into module
+constants at import time, and \texttt{providers.py} binds those constants in
+turn. The command-line flags that override the keys therefore have to be written
+into the environment before either module is imported, which is why
+\texttt{main.py} defers its import of the dashboard into the body of
+\texttt{main()}. Hoisting that import to the top of the file disables every key
+flag without raising anything, and the test suite still passes, because the flag
+handling is tested directly rather than through the import order.
+
+\subsection{State and testability}
+
+Every function in the mining, verification and analysis packages is stateless:
+it takes a loaded bundle and returns a value, holding no module-level state and
+caching nothing. The only mutable state in the running dashboard is the loaded
+bundle itself, held per browser session; two sessions are independent, and
+nothing is shared server-side. Results are recomputed on each request rather
+than cached.
+
+That is what makes the analysis testable without a web server. The dashboard
+callbacks are ordinary functions in \texttt{ui/handlers.py} with no Gradio
+import, so they are called directly by the tests; the suite comprises 202 tests
+over the package, including regression tests that pin the measured figures
+reported here against the real logs.
+
+All tables and figures in this report are generated from the analysis code by
+\texttt{scripts/build\_tables.py} and \texttt{scripts/build\_figures.py}. No
 measured value has been transcribed by hand.
 
 \section{Conclusions}\label{sec:conclusions}
