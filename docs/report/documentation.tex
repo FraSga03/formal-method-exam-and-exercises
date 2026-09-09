@@ -18,12 +18,14 @@
 \lstset{basicstyle=\ttfamily\small, frame=single, breaklines=true,
         columns=fullflexible, backgroundcolor=\color{gray!8}}
 
+\setlength{\emergencystretch}{3em}
+
 \newcommand{\act}[1]{\texttt{#1}}
 
 \title{Process Mining and Formal Verification of the\\
        Volvo IT Incident Management Process\\
        \large BPI Challenge 2013}
-\author{Formal Methods}
+\author{Francesco Sgaramella}
 \date{\today}
 
 \begin{document}
@@ -38,35 +40,23 @@ temporal logic. Three findings emerge. Rework dominates the process: fewer than
 half of all recorded events are the first occurrence of their activity within a
 case. The documented procedure of queueing an incident before working it is
 violated in the large majority of cases, a deviation established by formal
-verification rather than by inspection. And the Alpha miner fails on this log in
-a way that is predicted by theory rather than caused by defect, because almost
-every case contains a length-one loop that the algorithm cannot represent.
+verification rather than by inspection. And the Alpha miner fails on this log, defeated by the loop behaviour of the
+process.
 \end{abstract}
-
-\tableofcontents
-\newpage
 
 \section{Introduction}
 
 \subsection{Context}
 
-Process mining derives models of real processes from the event logs that
-information systems record as a by-product of their operation. Where a
-conventional process model states how work is supposed to proceed, a discovered
-model states how it actually proceeded. The gap between the two is the object of
-study.
-
 This report applies process discovery, conformance checking and formal
 verification to the BPI Challenge 2013 dataset: the incident and problem
 management logs of Volvo IT Belgium, recorded by the VINST service management
-system. The dataset is a standard benchmark, which makes the results here
-comparable with published work.
-
+system.
 \subsection{Objectives}
 
 \begin{enumerate}
-  \item Derive process models from the logs and compare three discovery
-        algorithms on four measures of model quality.
+  \item Derive process models from the logs using three discovery
+        algorithms and compare them using metrics.
   \item Specify properties of the incident process in temporal logic and verify
         them against every recorded case.
   \item Quantify where time is spent and identify the structural sources of
@@ -75,105 +65,41 @@ comparable with published work.
         documented.
 \end{enumerate}
 
-\subsection{Structure}
-
-Section~\ref{sec:foundations} sets out the formal apparatus. Section~\ref{sec:dataset}
-describes the logs and the one modelling decision the dataset forces.
-Section~\ref{sec:discovery} compares the discovery algorithms;
-Section~\ref{sec:performance} analyses time; Section~\ref{sec:verification}
-presents the formal verification. Section~\ref{sec:health} aggregates the
-measures, Section~\ref{sec:architecture} describes the implementation, and
-Section~\ref{sec:conclusions} states the conclusions and the limits of the
-analysis.
-
 \section{Theoretical foundations}\label{sec:foundations}
 
 \subsection{Event logs}
 
 An event log is a multiset of traces. A trace is a finite sequence of events
-belonging to one case, ordered by timestamp. Each event carries at minimum a
-case identifier, an activity name and a timestamp; the logs analysed here carry
-further attributes recording the organisation and resource involved.
-
-Writing $\Sigma$ for the set of activities, a trace is an element of $\Sigma^*$
-and a log is a multiset over $\Sigma^*$. Two traces with the same activity
-sequence belong to the same \emph{variant}. The number of distinct variants
-relative to the number of cases measures how standardised a process is.
+belonging to one case, ordered by timestamp; each event carries at minimum a
+case identifier, an activity name and a timestamp. Writing $\Sigma$ for the set
+of activities, a trace is an element of $\Sigma^*$ and a log is a multiset over
+$\Sigma^*$. Two traces with the same activity sequence belong to the same
+variant, so few variants means a standardised process.
 
 \subsection{Petri nets}
 
-A Petri net is a tuple $N = (P, T, F)$ where $P$ and $T$ are disjoint finite
-sets of places and transitions and $F \subseteq (P \times T) \cup (T \times P)$
-is the flow relation. A marking assigns tokens to places; a transition is
-enabled when each of its input places holds a token, and firing it consumes
-those tokens and produces one in each output place. A labelled net maps
-transitions to activities, with unlabelled (silent) transitions permitted to
-express routing that corresponds to no recorded event.
-
-An accepting Petri net additionally fixes an initial and a final marking. A
-trace is \emph{replayable} if some firing sequence whose visible labels spell
-the trace leads from the initial to the final marking.
+A Petri net models the control flow of a log. Different discovery techniques
+extract that flow from the recorded events.
 
 \subsection{Conformance dimensions}
 
-Model quality is not a single quantity. Four dimensions are standard, and they
-trade off against one another, so all four must be reported together.
+Four dimensions are used to compare the discovered Petri nets.
 
 \begin{description}
   \item[Fitness] The extent to which the model can replay the traces in the log.
-        A fitness of $1$ means every observed case is replayable. Low fitness
-        means the model forbids behaviour that actually occurred.
-  \item[Precision] The converse: the extent to which the model forbids behaviour
-        that never occurred. Low precision indicates an over-permissive model,
-        in the limit a ``flower'' model that permits any sequence whatsoever and
-        therefore fits perfectly while explaining nothing.
+        A fitness of $1$ means every observed case is replayable.
+  \item[Precision] The extent to which the model forbids behaviour
+        that never occurred. Low precision indicates an over-permissive model.
   \item[Generalisation] The extent to which the model is expected to accommodate
         future behaviour rather than being overfitted to the observed traces.
-  \item[Simplicity] A structural measure penalising an excess of places,
-        transitions and arcs relative to the behaviour captured.
+  \item[Simplicity] A structural measure penalising the complexity of the net.
 \end{description}
-
-Maximising fitness alone is trivial and maximising precision alone is trivial;
-the interesting question is the balance, and it is why
-Section~\ref{sec:discovery} reports a table rather than a winner.
 
 \subsection{Linear temporal logic over finite traces}\label{sec:ltlf}
 
 Properties of traces are expressed in linear temporal logic. Because a case is a
-\emph{finite} sequence of events, the semantics used here are those of
-$\text{LTL}_f$, linear temporal logic interpreted over finite traces.
-
-Given atomic propositions $p$ drawn from the activity alphabet, formulas are
-built as
-\[
-  \varphi ::= p \mid \neg\varphi \mid \varphi \wedge \varphi \mid
-  \varphi \vee \varphi \mid \varphi \rightarrow \varphi \mid
-  \mathbf{X}\varphi \mid \mathbf{F}\varphi \mid \mathbf{G}\varphi \mid
-  \varphi \,\mathbf{U}\, \varphi .
-\]
-
-For a trace $\pi = \pi_0\pi_1\ldots\pi_{n-1}$ and position $i < n$:
-
-\begin{align*}
-  \pi, i \models p &\iff p \text{ holds at } \pi_i \\
-  \pi, i \models \mathbf{X}\varphi &\iff i + 1 < n \text{ and } \pi, i+1 \models \varphi \\
-  \pi, i \models \mathbf{F}\varphi &\iff \exists j.\, i \leq j < n \text{ and } \pi, j \models \varphi \\
-  \pi, i \models \mathbf{G}\varphi &\iff \forall j.\, i \leq j < n \implies \pi, j \models \varphi \\
-  \pi, i \models \varphi \,\mathbf{U}\, \psi &\iff
-     \exists j.\, i \leq j < n,\ \pi, j \models \psi,\
-     \text{and } \forall k.\, i \leq k < j \implies \pi, k \models \varphi
-\end{align*}
-
-A trace satisfies $\varphi$ when $\pi, 0 \models \varphi$.
-
-The clause for $\mathbf{X}$ deserves emphasis, because it is the source of a
-result reported in Section~\ref{sec:verification}. In $\text{LTL}_f$,
-$\mathbf{X}$ is the \emph{strong} next operator: at the final position of a
-trace there is no successor, so $\mathbf{X}\varphi$ is false there for every
-$\varphi$. A property written with $\mathbf{X}$ therefore fails on every trace
-that ends in the state the property constrains, whether or not the process
-misbehaved. This is correct semantics, not a defect, but it is a trap for anyone
-transferring formulas from the infinite-trace setting.
+finite sequence of events, the semantics used here are those of linear temporal
+logic interpreted over finite traces.
 
 \section{The dataset}\label{sec:dataset}
 
@@ -186,44 +112,23 @@ those closed at the time of extraction.
 \begin{table}[H]
 \centering
 \input{../tables/dataset.tex}
-\caption{The three logs after loading. Case and event counts reproduce the
-published figures exactly, which serves as a check on the loader.}
+\caption{The three Volvo IT Belgium's VINST system logs comparison}
 \label{tab:dataset}
 \end{table}
 
 The incident log is the principal object of study; the problem logs are used for
 comparison in Section~\ref{sec:health}. They are not variants of one process.
-Median case duration differs by an order of magnitude, and the problem logs use
-a smaller activity alphabet.
 
 \subsection{The activity label is a modelling decision}\label{sec:mode}
 
-The dataset has no activity column. Each event records a \act{Status} and a
-\act{Sub Status}, and what counts as an activity must be decided by the analyst.
-Two choices are defensible:
-
-\begin{itemize}
-  \item \act{Status} alone yields four activities: \act{Accepted}, \act{Queued},
-        \act{Completed}, \act{Unmatched}.
-  \item \act{Status+Sub Status} yields thirteen, distinguishing for instance
-        \act{Accepted+In Progress} from \act{Accepted+Wait - User}.
-\end{itemize}
-
-The choice is consequential rather than cosmetic. Under the coarse labelling the
-discovered models are small and the distinction between waiting on a vendor and
-waiting on a user disappears entirely --- and with it the central performance
-finding of Section~\ref{sec:performance}. Under the fine labelling the models
-are three times larger and precision falls across every algorithm, because there
-is more distinct behaviour to explain.
-
-This report adopts \act{Status+Sub Status} as the primary labelling, and reports
-both in Section~\ref{sec:discovery} so that the effect of the choice is visible
-rather than assumed. Treating this decision as a parameter, rather than fixing
-it silently in the loader, is a deliberate design commitment.
+Each event records a \act{Status} and a
+\act{Sub Status}. The two can be treated as one composite label or as independent
+dimensions; the composite choice increases the complexity of the resulting Petri
+net.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{activity_frequency.png}
+\includegraphics[width=0.68\textwidth]{activity_frequency.png}
 \caption{Event counts per activity in the incident log under the composite
 labelling. \act{Accepted+In Progress} accounts for the plurality of all events.}
 \label{fig:activity-frequency}
@@ -236,16 +141,11 @@ labelling. \act{Accepted+In Progress} accounts for the plurality of all events.}
 Three algorithms are compared.
 
 \begin{description}
-  \item[Alpha miner] Infers ordering relations from directly-follows pairs and
-        constructs a net from them. Simple and historically foundational, but it
-        assumes the log is complete and noise-free, and it cannot represent
-        short loops.
-  \item[Heuristics miner] Weights the directly-follows relation by frequency and
-        applies a dependency threshold, so infrequent behaviour is filtered out
-        rather than modelled. Robust to noise.
-  \item[Inductive miner] Recursively partitions the directly-follows graph and
-        emits a process tree, which is converted to a net. Guarantees soundness
-        and, at a noise threshold of zero, perfect fitness.
+  \item[Alpha miner] Infers ordering relations from consecutive states and
+        constructs a net from them. It does not handle noise and loops.
+  \item[Heuristics miner] Uses consecutive states frequency and
+        applies a dependency threshold, so infrequent behaviour is filtered out.
+  \item[Inductive miner] Uses trees that are converted into graphs to model the net. Guarantees soundness and, at a noise threshold of zero, perfect fitness.
 \end{description}
 
 \subsection{Results}
@@ -261,21 +161,15 @@ cases. Both activity labellings are shown.}
 
 Three observations follow.
 
-\paragraph{The fitness--precision trade-off is textbook.} The Inductive miner
-attains perfect fitness in both labellings, as its construction guarantees, and
-pays for it in precision: it buys replayability by being permissive, and it
-produces by far the largest net. The Heuristics miner sacrifices a little
-fitness for substantially better precision in a net a fraction of the size. If a
-single model must be shown to a human, it is the Heuristics model.
+\paragraph{The fitness and precision trade off.} The Inductive miner
+attains perfect fitness but loses precision: it buys replayability by being
+permissive, and it produces by far the largest net. The Heuristics miner sacrifices a little
+fitness for substantially better precision in a net a fraction of the size.
 
-\paragraph{The Alpha miner collapses, and theory predicts it.}
+\paragraph{The Alpha miner fails.}
 Its fitness falls below $0.15$ in both labellings and the net degenerates to two
-places. This is not a defect in the implementation. Ninety percent of cases in
-this log contain a length-one loop --- an activity immediately repeated --- and
-the Alpha miner provably cannot represent such loops, because the ordering
-relations it infers from a directly-follows pair $(a,a)$ are contradictory. The
-result is a negative one worth reporting: it demonstrates the boundary of an
-algorithm's applicability on a real log.
+places. Loops are the cause: ninety percent of cases in this log contain at
+least one length-one loop, which the Alpha miner provably cannot represent.
 
 \paragraph{Finer labels cost precision.} Moving from four activities to thirteen
 lowers precision for every algorithm and roughly triples model size, for the
@@ -283,7 +177,7 @@ reason given in Section~\ref{sec:mode}.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{petri_heuristics_status.png}
+\includegraphics[width=0.62\textwidth]{petri_heuristics_status.png}
 \caption{Heuristics miner, \act{Status} labelling. The best-balanced model of
 those compared.}
 \label{fig:petri-heuristics}
@@ -291,7 +185,7 @@ those compared.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.6\textwidth]{petri_alpha_status.png}
+\includegraphics[width=0.45\textwidth]{petri_alpha_status.png}
 \caption{Alpha miner, \act{Status} labelling. The degenerate structure is the
 consequence of length-one loops, not of noise in the data.}
 \label{fig:petri-alpha}
@@ -303,8 +197,7 @@ consequence of length-one loops, not of noise in the data.}
 
 Waiting time is measured as the interval between an event and the next event of
 the same case. The last event of a case has no successor and is therefore
-excluded, rather than being recorded as zero; conflating the two would bias
-every terminal activity downwards.
+excluded.
 
 \begin{table}[H]
 \centering
@@ -318,15 +211,12 @@ median are reported; see below for why either alone misleads.}
 \subsection{Mean and median diverge}
 
 For \act{Accepted+In Progress} the median waiting time is on the order of
-minutes while the mean is on the order of hours. The distribution is
-heavy-tailed: work is normally picked up immediately and occasionally stalls for
-a very long time. Reporting the mean alone would suggest a slow activity;
-reporting the median alone would conceal the stalls. Both appear in
-Table~\ref{tab:waiting} and in Figure~\ref{fig:waiting} for this reason.
+minutes while the mean is on the order of hours. The work is normally picked up immediately and occasionally stalls for
+a very long time. Both are reported to show the phenomenon.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{waiting_times.png}
+\includegraphics[width=0.68\textwidth]{waiting_times.png}
 \caption{Mean against median waiting time for the slowest activities. Where the
 bars diverge sharply, the activity is usually fast and occasionally pathological.}
 \label{fig:waiting}
@@ -334,30 +224,27 @@ bars diverge sharply, the activity is usually fast and occasionally pathological
 
 \subsection{Where the time goes}
 
-The \act{Wait} states dominate mean waiting time: waiting on a vendor, on an
-implementation, on a customer and on a user each average well over a hundred
-hours. This is the expected shape for a support process whose delays are
+The \act{Wait} states dominate mean waiting time characteristic for a support process whose delays are
 external rather than internal, and it locates the improvement opportunity
 outside the service desk itself.
 
-One entry requires comment. \act{Completed+Closed} appears in
-Table~\ref{tab:waiting} at all, which means a substantial number of closure
-events were \emph{not} the last event of their case: work continued after the
-incident was formally closed. Section~\ref{sec:verification} arrives at the same
-conclusion by a completely different route.
+That \act{Completed+Closed} appears in Table~\ref{tab:waiting} at all means a
+substantial number of closure events were \emph{not} the last event of their
+case: work continued after the incident was formally closed.
+Section~\ref{sec:verification} reaches the same conclusion by another route.
 
 \subsection{Duration and variability}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth]{duration_hist.png}
+\includegraphics[width=0.52\textwidth]{duration_hist.png}
 \caption{Distribution of case durations in the incident log.}
 \label{fig:duration}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth]{variant_pareto.png}
+\includegraphics[width=0.52\textwidth]{variant_pareto.png}
 \caption{Cumulative share of cases covered by the most frequent variants. The
 curve flattens early: a large minority of cases follow paths that occur once.}
 \label{fig:pareto}
@@ -373,16 +260,14 @@ Table~\ref{tab:discovery}.
 
 \subsection{Specification}
 
-Eight properties were specified in $\text{LTL}_f$ over the composite activity
+Eight properties were specified in temporal logic over the composite activity
 alphabet, with activity labels mapped to proposition symbols
-(\act{Accepted+In Progress} becomes \texttt{accepted\_in\_progress}). Each
-property is evaluated independently against every case, and the satisfaction
-ratio is the share of cases satisfying it. Cases that violate a property are
-retained as counterexamples.
-
-Six properties express expectations that ought to hold. Two express the
-documented procedure, and are included precisely because they are expected to
-fail; the size of the gap is the result.
+(\act{Accepted+In Progress} becomes \texttt{accepted\_in\_progress}). Each is
+evaluated independently against every case; the satisfaction ratio is the share
+of cases satisfying it, and violating cases are retained as counterexamples. Six
+properties express expectations that ought to hold; two express the documented
+procedure and are included because they are expected to fail, the size of the
+gap being the result.
 
 \begin{table}[H]
 \centering
@@ -404,16 +289,13 @@ else is wrong with this process, cases do not disappear into it.
   \neg\mathbf{F}\,\texttt{accepted\_in\_progress})
 \]
 fails for a small but non-trivial number of cases: an incident is formally
-closed and then worked again. This corroborates, from the verification side, the
-appearance of \act{Completed+Closed} in the waiting-time table of
-Section~\ref{sec:performance}. Two independent methods agreeing is stronger
-evidence than either alone.
+closed and then worked again, corroborating the appearance of
+\act{Completed+Closed} in the waiting-time table of
+Section~\ref{sec:performance}.
 
 \paragraph{Formal closure is not universal.} A quarter of incidents that are
 worked never reach \act{Completed+Closed}; they are settled as
-\act{Completed+In Call} instead. Whether this is a process defect or an
-undocumented but legitimate resolution path is a question for the process owner.
-The analysis establishes that the two routes coexist at scale.
+\act{Completed+In Call} instead.
 
 \paragraph{Queueing does not precede work.} The documented procedure is that an
 incident is queued for assignment and then taken up. Formally,
@@ -422,9 +304,7 @@ incident is queued for assignment and then taken up. Formally,
   \texttt{queued\_awaiting\_assignment}.
 \]
 This holds for a small minority of cases. In the large majority, work begins
-without the incident ever having been queued. This is the ``push to front''
-pattern for which the BPI 2013 dataset is known, and it is here established as a
-formal property of the log rather than inferred from inspection of variants.
+without the incident ever having been queued.
 
 \subsection{A methodological result: strong next}\label{sec:strongx}
 
@@ -433,22 +313,13 @@ The no-work-after-closure property was first written in the form
   \mathbf{G}\,(\texttt{completed\_closed} \rightarrow
   \mathbf{X}\,\mathbf{G}\,\neg\,\texttt{accepted\_in\_progress}),
 \]
-which is the natural formulation in infinite-trace LTL and reports a
-satisfaction ratio of roughly one quarter --- an apparently severe process
-failure. The figure is an artefact. As established in Section~\ref{sec:ltlf},
-$\mathbf{X}$ is false at the final position of a finite trace, and the majority
-of cases in this log \emph{end} with \act{Completed+Closed}. Every such case
-falsifies the implication for reasons that have nothing to do with the process.
-
-The $\mathbf{F}$-based formulation given above avoids the next operator entirely
-and reports the true figure of roughly $98\%$. The two numbers differ by a
-factor of nearly four, and only one of them is about Volvo IT.
-
-The general lesson is that finite-trace semantics must be applied deliberately
-when specifying properties of event logs, since a log is by construction a
-collection of finite traces. Verification tooling that silently accepts an
-infinite-trace formula will return a number, and the number will be wrong in a
-direction that looks like a finding.
+the natural infinite-trace formulation, which reports a satisfaction ratio of
+roughly one quarter, an apparently severe process failure. The figure is an
+artefact: $\mathbf{X}$ is false at the final position of a finite trace
+(Section~\ref{sec:ltlf}) and most cases here \emph{end} with
+\act{Completed+Closed}, falsifying the implication for reasons unrelated to the
+process. The $\mathbf{F}$-based formulation above avoids $\mathbf{X}$ and
+reports the true figure of roughly $98\%$.
 
 \section{Aggregate assessment}\label{sec:health}
 
@@ -467,252 +338,101 @@ better on every component.}
 \label{tab:health}
 \end{table}
 
-The weighting and the throughput horizon are stipulated, not derived. The score
-is therefore a comparison aid across logs and labellings and carries no absolute
-meaning; this limitation is restated in Section~\ref{sec:threats}.
-
-Read component-wise, one term dominates the incident log's result. Completion is
-near perfect and variability is moderate, but fewer than half of all events are
-first occurrences of their activity. \textbf{Over half of all recorded work in
-the incident process is repetition.} This is the single largest lever available
-and it is consistent with the picture from every other section: heavy looping,
-work resumed after closure, and thousands of one-off variants.
+The weighting and the throughput horizon are stipulated, so the score compares
+logs and labellings but carries no absolute meaning. Completion is near perfect
+and variability moderate, but fewer than half of all events are first
+occurrences of their activity: over half of the recorded work in the incident
+process is repetition.
 
 \section{Implementation}\label{sec:architecture}
 
-\subsection{Technology stack}
+The analysis is a single self-contained Python package; dependencies are
+declared in \texttt{pyproject.toml} and resolved with \texttt{uv}. The results
+reported here were produced with Python 3.12, pm4py 2.7.23, flloat 0.3.0,
+pandas 3.0 and Graphviz 2.43, with Gradio 6.26 for the dashboard and Matplotlib
+3.11 for the figures. The language model clients are an optional extra.
 
-The analysis is a single self-contained Python package. Dependencies are
-declared in \texttt{pyproject.toml} and resolved with \texttt{uv}; the versions
-in Table~\ref{tab:stack} are those the reported results were produced with.
+\texttt{logs.loader.load} detects the schema, derives the activity label and
+returns an \texttt{EventLogBundle} carrying the pm4py log, the full source
+frame, the schema and the labelling mode. Normalisation \emph{adds} the
+XES-standard columns rather than reducing each event to them, preserving the
+support-line, ownership and country attributes that Section~\ref{sec:threats}
+identifies as the basis of any continuation of this work. The label is computed
+here from the \act{Status} and \act{Sub Status} pair, under a mode that is a
+parameter of \texttt{load} and is then frozen into the bundle: the single point
+at which the modelling decision of Section~\ref{sec:mode} enters the system, and
+what allows the same log to be loaded twice under different labellings and the
+two models compared.
 
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{llp{7.2cm}}
-\toprule
-Component & Version & Role \\
-\midrule
-Python        & 3.12    & Language runtime \\
-uv            & 0.11    & Dependency resolution and virtual environment \\
-pm4py         & 2.7.23  & XES parsing, the three discovery algorithms, conformance metrics, Petri net rendering \\
-flloat        & 0.3.0   & $\text{LTL}_f$ parsing and evaluation over finite traces \\
-Graphviz      & 2.43    & External renderer invoked by pm4py for the Petri net figures \\
-pandas        & 3.0     & The event table underlying every analysis \\
-Gradio        & 6.26    & Browser dashboard \\
-Plotly        & 7.0     & Interactive figures in the dashboard \\
-Matplotlib    & 3.11    & Static figures for this report \\
-pytest        & 9.1     & Test suite \\
-\bottomrule
-\end{tabular}
-\caption{Technology stack.}
-\label{tab:stack}
-\end{table}
+Verification encodes each case as one finite word. Since activity labels are not
+valid proposition symbols, \texttt{verification.ltl.Alphabet} maps them to
+identifiers (\act{Accepted+In Progress} becomes
+\texttt{accepted\_in\_progress}) and gives each position a total truth
+assignment, as flloat requires. A symbol absent from the log is padded to false
+throughout; strict parsing rejects a symbol that names no activity anywhere in
+the dataset, separating a genuinely absent activity from a mistyped one. The
+eight named properties are declared as data and evaluated by the same function
+that evaluates a formula typed into the dashboard.
 
-Two dependencies are optional extras rather than requirements. The \texttt{ai}
-extra carries the language model clients; the software runs, and its tests pass,
-without it installed, because those imports occur inside the functions that use
-them.
+The dashboard exposes the same analyses interactively across ten panels. Beyond
+the discovery, conformance, verification and performance results reported above,
+three of them are exploratory rather than confirmatory. Preprocessing composes
+the filters of \texttt{logs.preprocessing} in a fixed order --- activities, time
+range, case length, duplicates, relabelling --- so that a result does not depend
+on the order in which the controls were operated; each application replaces the
+session log, and reloading restores it. The anomaly panel reports the four
+statistical outlier families of \texttt{analysis.anomalies} --- case lengths
+beyond a chosen number of standard deviations, activities below a share of all
+events, waits beyond a duration, and transitions below a support --- with every
+threshold exposed as a control, since each is a modelling choice rather than a
+property of the log. The prediction panel fits the first-order Markov model of
+\texttt{analysis.predictor} that also produces the transition heatmap of
+Section~\ref{sec:performance}, and reports successor probabilities and the
+greedy most-likely continuation from a chosen activity; the Markov assumption
+makes a long walk indicative rather than a forecast, and on these logs it enters
+the \act{Accepted+In Progress}--\act{Completed+Closed} cycle that
+Section~\ref{sec:health} identifies as reopening.
 
-\subsection{Module organisation}
-
-\begin{lstlisting}
-volvo/
-  config.py            paths and API keys read from the environment; no domain knowledge
-  domain.py            log schemas, activity-label derivation, the VINST alphabet
-  main.py              command-line entry point
-  logs/
-    loader.py          EventLogBundle, schema detection, normalisation
-    preprocessing.py   filters and relabelling; each returns a new bundle
-  mining/
-    discovery.py       discover(): Alpha, Heuristics, Inductive -> DiscoveryResult
-    conformance.py     evaluate(): fitness, precision, generalisation, simplicity
-    comparison.py      compare_algorithms(): one scored row per algorithm
-    performance.py     waiting times, case durations, trace variants
-  verification/
-    ltl.py             Alphabet, trace encoding, verify()
-    patterns.py        the eight named properties and their formulas
-  analysis/
-    health.py          composite score and threshold-triggered insights
-    anomalies.py       outlier lengths, rare activities, long waits, rare transitions
-    predictor.py       MarkovModel: first-order transition probabilities
-  ai/
-    providers.py       provider protocol, availability probing, selection order
-    assistant.py       fact block assembled from the loaded log, and the prompt
-  ui/
-    app.py             Gradio layout and event wiring only
-    handlers.py        every callback, as plain functions with no Gradio import
-    charts.py          Plotly figures
-  reporting/
-    report.py          collect facts, render Markdown, optional narrative section
-  tests/               202 tests over the above
-scripts/
-  fetch_data.py        resolves the three logs through the figshare API
-  run_baseline.py      algorithm comparison, once per labelling mode
-  run_verification.py  the property library against the incident log
-  run_analytics.py     performance, anomalies and score for every log
-  run_report.py        one generated report per log
-  build_figures.py     docs/figures/*.png
-  build_tables.py      docs/tables/*.tex
-  build_all.py         runs the above in dependency order, then both documents
-\end{lstlisting}
-
-The dependency direction is strictly downward: \texttt{ui} and
-\texttt{reporting} and \texttt{scripts} depend on the analysis packages, the
-analysis packages depend on \texttt{logs} and \texttt{domain}, and nothing
-depends on \texttt{ui}.
-
-\subsection{The loaded log}
-
-\texttt{logs.loader.load} dispatches on the file extension, detects the schema
-by matching the declared column triples in \texttt{domain.py} against the
-columns actually present, and returns an \texttt{EventLogBundle}: the pm4py
-\texttt{EventLog}, the full source frame, the schema, the labelling mode and the
-source filename.
-
-Normalisation \emph{adds} the four XES-standard columns
-(\texttt{case:concept:name}, \texttt{concept:name}, \texttt{time:timestamp} and,
-where declared, \texttt{org:resource}) to a copy of the raw frame. No column is
-dropped. Reducing each event to the three standard columns, as is common, would
-discard the support-line, ownership and country attributes that
-Section~\ref{sec:threats} identifies as the basis of any continuation of this
-work; these attributes have no XES-standard name and would be unrecoverable
-without reparsing.
-
-The activity label is computed here, by \texttt{domain.derive\_activity}, from
-the \act{Status} and \act{Sub Status} pair under one of three modes
-(\texttt{status}, \texttt{substatus}, \texttt{status\_substatus}). The mode is a
-parameter of \texttt{load} and is then frozen into the bundle. This is the
-single point at which the modelling decision of Section~\ref{sec:mode} enters
-the system, which is what allows the same log to be loaded twice under different
-labellings and the two discovered models compared directly, as
-Table~\ref{tab:discovery} does.
-
-Preprocessing steps are functions from bundle to bundle. A step that would leave
-no events raises rather than returning an empty log.
-
-\subsection{Verification}
-
-Activity labels such as \act{Accepted+In Progress} are not valid proposition
-symbols. \texttt{verification.ltl.Alphabet} therefore builds a bidirectional map
-between the labels of a given log and identifiers derived from them
-(\act{Accepted+In Progress} becomes \texttt{accepted\_in\_progress}), resolving
-any collision with a numeric suffix.
-
-Each case is one finite word. \texttt{encode\_trace} converts a case's activity
-sequence into one propositional interpretation per position, with every symbol
-of the alphabet assigned a truth value; flloat requires a total assignment at
-each position rather than the set of true symbols. A formula parsed by
-\texttt{LTLfParser} is then evaluated at position zero of each encoded trace,
-and the case is counted as satisfying or violating. Violating cases are retained
-as counterexamples up to a bound, which is where the traces quoted in
-Section~\ref{sec:verification} come from.
-
-Symbols named in a formula that the current log does not contain are padded to
-false at every position, so a property may be evaluated against a log with a
-smaller alphabet. Strict parsing additionally rejects a symbol that names no
-activity anywhere in the dataset, which distinguishes an activity that is
-genuinely absent from a mistyped one.
-
-The eight properties are declared as data --- key, name, description, formula
-and the ratio measured on the incident log --- and are evaluated by the same
-function that evaluates a formula typed into the dashboard. There is no separate
-code path behind a named property. The recorded ratios are asserted by the test
-suite, so a change in the analysis that moved any published figure would fail
-the build rather than silently update the report.
-
-\subsection{AI-assisted analysis}
-
-The dashboard can pass a block of measured facts to a language model and ask it
-to answer questions about them or to write a narrative section for a generated
-report. The block is assembled by \texttt{ai.assistant.context}: counts, the
-composite score and its components, duration quantiles, variant statistics, the
-slowest activities and the verification verdicts. The prompt instructs the model
-to use only those facts and to quote figures exactly. This is the only component
-whose output is not reproducible, and no figure in this report originates from
-it.
-
-Three providers are supported behind a single protocol: a local Ollama server
-and the two hosted APIs. Availability is probed rather than assumed --- a
-provider is offered only if both its client library and its key or server are
-present, and the local provider is preferred, so automatic selection never
-incurs a charge. With nothing configured the provider list is empty, the
-dashboard's provider selector reads \texttt{none}, and the report generator
-omits the narrative section; every other feature is unaffected.
-
-One implementation constraint is worth recording, because violating it fails
-silently. \texttt{config.py} reads the API keys from the environment into module
-constants at import time, and \texttt{providers.py} binds those constants in
-turn. The command-line flags that override the keys therefore have to be written
-into the environment before either module is imported, which is why
-\texttt{main.py} defers its import of the dashboard into the body of
-\texttt{main()}. Hoisting that import to the top of the file disables every key
-flag without raising anything, and the test suite still passes, because the flag
-handling is tested directly rather than through the import order.
-
-\subsection{State and testability}
-
-Every function in the mining, verification and analysis packages is stateless:
-it takes a loaded bundle and returns a value, holding no module-level state and
-caching nothing. The only mutable state in the running dashboard is the loaded
-bundle itself, held per browser session; two sessions are independent, and
-nothing is shared server-side. Results are recomputed on each request rather
-than cached.
-
-That is what makes the analysis testable without a web server. The dashboard
-callbacks are ordinary functions in \texttt{ui/handlers.py} with no Gradio
-import, so they are called directly by the tests; the suite comprises 202 tests
-over the package, including regression tests that pin the measured figures
-reported here against the real logs.
-
-All tables and figures in this report are generated from the analysis code by
-\texttt{scripts/build\_tables.py} and \texttt{scripts/build\_figures.py}. No
-measured value has been transcribed by hand.
+Every function in the mining, verification and analysis packages is stateless;
+the only mutable state in the running dashboard is the bundle itself, held per
+browser session. The callbacks are therefore ordinary functions with no Gradio
+import, and the suite comprises 234 tests, including regression tests pinning
+the measured figures reported here against the real logs. All tables and figures
+are generated from the analysis code.
 
 \section{Conclusions}\label{sec:conclusions}
 
 \subsection{Findings}
 
-\begin{enumerate}
-  \item \textbf{Rework dominates.} Fewer than half of the events in the incident
-        log are the first occurrence of their activity within the case. The
-        majority of recorded work is repetition, and this is the principal
-        driver of the aggregate score.
-  \item \textbf{The documented procedure is not the executed procedure.}
-        Queueing before work holds for a small minority of cases; the ``push to
-        front'' pattern is dominant. This was established by formal verification
-        over every case, not by sampling or inspection.
-  \item \textbf{The Alpha miner is inapplicable to this log.} Its failure is
-        predicted by the prevalence of length-one loops and constitutes a
-        demonstration of a known theoretical boundary rather than an empirical
-        surprise.
-\end{enumerate}
+Three results stand out. Rework dominates: fewer than half of the events are the
+first occurrence of their activity within their case, and this drives the
+aggregate score down rather than any single slow step. The documented procedure
+is not the executed procedure (queueing before work holds for a small minority
+of cases and the ``push to front'' pattern dominates), established by
+formal verification over every case rather than by sampling. And the Alpha miner
+is inapplicable here, its failure predicted by the prevalence of length-one
+loops.
 
 \subsection{Threats to validity}\label{sec:threats}
 
-\begin{itemize}
-  \item Conformance metrics are computed on a sample of cases rather than the
-        full log, because alignment-based computation does not terminate in
-        reasonable time at full scale. Sampling is deterministic but not random.
-  \item Token-based replay, used for the headline figures, is an approximation
-        and is known to be optimistic on unsound nets. Alignment-based
-        computation is implemented and available, and agrees on the sample.
-  \item The composite score's weights and horizon are stipulated. Component
-        values are meaningful; the aggregate is meaningful only comparatively.
-  \item \act{Unmatched+Unmatched} is an artefact of the VINST export rather than
-        a process step. It is retained rather than filtered, so that its
-        prevalence is visible, but it should not be read as work.
-  \item Findings concern what the system recorded. Work performed but not
-        recorded is invisible to every method used here, and a process with poor
-        recording discipline will appear to have more rework than it has.
-\end{itemize}
+Conformance metrics are computed on a deterministic but non-random sample,
+because alignment-based computation does not terminate at full scale; the
+headline figures use token-based replay, optimistic on unsound nets, and the
+implemented alignment-based computation agrees on the sample. The composite
+score's weights and horizon are stipulated, so only its components are
+meaningful in absolute terms. \act{Unmatched+Unmatched} is an export artefact,
+retained so its prevalence stays visible, and should not be read as work.
+
+Every finding here concerns what the system recorded: work performed but not
+recorded is invisible to all of these methods, and poor recording discipline
+appears as rework.
 
 \subsection{Further work}
 
-The loader retains the organisational attributes that this analysis does not yet
-use. The natural continuations are handover-of-work analysis across the support
-lines, quantification of the push-to-front pattern by organisation rather than
-by trace shape, and comparison of the incident and problem processes as distinct
-but interacting systems. Each is supported by the data already loaded.
+The loader retains organisational attributes this analysis does not yet use.
+The natural continuations, all supported by the data already loaded, are
+handover-of-work analysis across the support lines, quantification of the
+push-to-front pattern by organisation rather than by trace shape, and comparison
+of the incident and problem processes as interacting systems.
 
 \end{document}

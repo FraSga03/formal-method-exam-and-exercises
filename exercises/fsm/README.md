@@ -1,9 +1,6 @@
 # Movie review FSM
 
-A finite state machine driving an LLM agent. Each state carries a prompt, a
-set of declared transitions and, where it collects structured data, a pydantic
-response model. The model chooses the transition; the code decides what the
-transition does.
+A finite state machine driving an LLM agent that based on response carries on the execution of the fsm.
 
 ## Running
 
@@ -17,17 +14,7 @@ project root; `--api-key` wins over both. `--model` picks the OpenAI model.
 
 Type `quit` or `exit`, or press Ctrl-C, to end the conversation.
 
-Reviews are stored in `reviews.json` beside this file, one per film — a second
-review of the same film replaces the first. The file is not tracked in git.
-
-## Tests
-
-```bash
-uv run pytest . -v
-```
-
-The state handlers need a live model and are not unit tested. The validation,
-the persistence and the pure helpers are.
+Reviews are stored in `reviews.json`.
 
 ## States
 

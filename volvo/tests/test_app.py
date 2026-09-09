@@ -51,3 +51,9 @@ def test_every_activity_mode_is_offered():
 
     assert set(MODES) == set(get_args(ActivityMode))
     assert set(get_args(ActivityMode)) <= offered
+
+
+def test_app_declares_the_anomalies_and_prediction_tabs():
+    labels = _tab_labels(build())
+
+    assert {"Anomalies", "Prediction"} <= labels

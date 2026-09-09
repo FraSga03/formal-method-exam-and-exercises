@@ -3,6 +3,7 @@ name = "volvo-process-mining"
 version = "0.1.0"
 description = "Process mining and LTL verification over the BPI Challenge 2013 Volvo IT logs"
 requires-python = ">=3.12"
+authors = [{ name = "Francesco Sgaramella" }]
 dependencies = [
     "pm4py>=2.7.23",
     "pandas>=2.0",

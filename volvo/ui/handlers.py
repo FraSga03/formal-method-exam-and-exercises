@@ -4,7 +4,9 @@ import plotly.graph_objects as go
 
 from volvo.ai import assistant as assistant_module
 from volvo.ai.providers import available_providers, describe, get_provider
+from volvo.analysis import anomalies
 from volvo.analysis.health import health_score, insights
+from volvo.analysis.predictor import MarkovModel, UnknownActivityError
 from volvo.config import DATA_DIR, OUTPUT_DIR
 from volvo.logs import preprocessing
 from volvo.logs.loader import ACTIVITY, EventLogBundle, load
@@ -179,13 +181,60 @@ def run_analytics(bundle):
     )
 
 
-def apply_preprocessing(bundle, min_events: int, dedupe: bool):
+def activity_choices(bundle) -> list[str]:
+    """Populates the activity pickers; empty until a log is loaded."""
+    if require_bundle(bundle):
+        return []
+    return sorted(bundle.df[ACTIVITY].unique().tolist())
+
+
+def parse_relabelling(text: str) -> dict[str, str]:
+    """One `old = new` per line. The first `=` separates; later ones are literal."""
+    mapping = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        if "=" not in line:
+            raise ValueError(f"line {number}: expected `old = new`, got {line.strip()!r}")
+        source, target = line.split("=", 1)
+        if not source.strip() or not target.strip():
+            raise ValueError(f"line {number}: both sides must be non-empty")
+        mapping[source.strip()] = target.strip()
+    return mapping
+
+
+def apply_preprocessing(
+    bundle,
+    activities: list[str] | None,
+    activity_action: str,
+    start: str,
+    end: str,
+    min_events: int,
+    max_events: int | None,
+    dedupe: bool,
+    relabelling: str,
+):
+    """Filters compose in a fixed order so the result does not depend on the widgets."""
     if require_bundle(bundle):
         return bundle, NO_LOG
     try:
-        result = preprocessing.filter_case_length(bundle, min_events=int(min_events))
+        mapping = parse_relabelling(relabelling or "")
+        result = bundle
+        if activities:
+            result = preprocessing.filter_activities(
+                result, activities, exclude=activity_action == "exclude"
+            )
+        if start or end:
+            result = preprocessing.filter_time_range(result, start or None, end or None)
+        result = preprocessing.filter_case_length(
+            result,
+            min_events=int(min_events),
+            max_events=int(max_events) if max_events else None,
+        )
         if dedupe:
             result = preprocessing.drop_duplicate_events(result)
+        if mapping:
+            result = preprocessing.generalize_activities(result, mapping)
     except Exception as exc:  # surfaced in the UI
         return bundle, f"**Error:** {exc}"
 
@@ -195,6 +244,62 @@ def apply_preprocessing(bundle, min_events: int, dedupe: bool):
         f"{summary['unique_cases']:,} cases remain."
     )
     return result, text
+
+
+def run_anomalies(
+    bundle, threshold_std: float, rare_pct: float, wait_hours: float, min_support: int
+):
+    empty = pd.DataFrame()
+    if require_bundle(bundle):
+        return NO_LOG, empty, empty, empty, empty
+
+    lengths = anomalies.unusual_trace_lengths(bundle, threshold_std=float(threshold_std))
+    rare = anomalies.rare_activities(bundle, threshold_pct=float(rare_pct))
+    waits = anomalies.long_waits(bundle, threshold_hours=float(wait_hours))
+    transitions = anomalies.rare_transitions(bundle, min_support=int(min_support))
+
+    text = (
+        f"**{len(lengths['cases']) + len(rare) + len(waits) + len(transitions)} anomalies**\n\n"
+        f"- case length outside {lengths['lower']:.1f}–{lengths['upper']:.1f} events "
+        f"(mean {lengths['mean']:.1f}, sd {lengths['std']:.1f}): {len(lengths['cases'])} cases\n"
+        f"- activities below {rare_pct:g}% of events: {len(rare)}\n"
+        f"- waits over {wait_hours:g} h: {len(waits)} (top 50 shown)\n"
+        f"- transitions seen fewer than {int(min_support)} times: {len(transitions)}"
+    )
+    return (
+        text,
+        pd.DataFrame(lengths["cases"]),
+        pd.DataFrame(rare),
+        pd.DataFrame(waits),
+        pd.DataFrame(transitions),
+    )
+
+
+def predict_next(bundle, activity: str, top_k: int):
+    if require_bundle(bundle):
+        return NO_LOG, pd.DataFrame()
+    try:
+        successors = MarkovModel.fit(bundle).predict_next(activity, top_k=int(top_k))
+    except UnknownActivityError as exc:
+        return f"**Error:** {exc}", pd.DataFrame()
+
+    if not successors:
+        return f"**{activity}** has no successor — every case ends there.", pd.DataFrame()
+    return (
+        f"Most likely to follow **{activity}**, over {len(successors)} of its successors.",
+        pd.DataFrame(successors),
+    )
+
+
+def predict_sequence(bundle, activity: str, length: int):
+    if require_bundle(bundle):
+        return NO_LOG
+    try:
+        walk = MarkovModel.fit(bundle).predict_sequence(activity, length=int(length))
+    except UnknownActivityError as exc:
+        return f"**Error:** {exc}"
+
+    return " → ".join(walk)
 
 
 def provider_choices() -> list[str]:

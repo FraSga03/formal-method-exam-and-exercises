@@ -15,8 +15,7 @@ NUSMV=/path/to/NuSMV ./check.sh
 ## `missionaries_and_cannibals.smv`
 
 Three missionaries and three cannibals, a boat for one or two, and cannibals
-may never outnumber missionaries on a bank. The safety rule is an `INVAR`, so
-it prunes the state space rather than being checked after the fact.
+may never outnumber missionaries on a bank.
 
 | Specification | Result | Meaning |
 |---|---|---|
@@ -24,9 +23,6 @@ it prunes the state space rather than being checked after the fact.
 | `!EF goal` | **false** | the counterexample is the eleven-crossing solution |
 | `AG EF goal` | true | no safe state is a dead end |
 | `AG EF start` | true | every crossing is reversible |
-
-Removing the `INVAR` is the instructive experiment — `!EF goal` is still
-refuted, but by a shorter trace in which the cannibals eat.
 
 ## `bridges.smv`
 
@@ -44,17 +40,9 @@ path exists and must start at A or D.
 | `B8_PRESENT -> ((LOCATION = lB \| LOCATION = lC) -> !EF all_crossed)` | true | from an even-degree vertex it does not |
 | `!(B8_PRESENT & EF all_crossed)` | **false** | the counterexample is the Eulerian path |
 
-The two scoped specifications are stated separately because a `CTLSPEC` is checked at
-every initial state and `INIT` leaves the starting vertex free. An unscoped
-`B8_PRESENT -> EF all_crossed` is simply false — a trail starting at B or C cannot
-finish — so stating both halves is what makes the model say Euler's theorem rather
-than half of it.
-
 ## `peterson.smv`
 
-Peterson's mutual exclusion for two processes. Interleaving uses an explicit
-unconstrained `sched` variable instead of the deprecated `process` keyword, so
-the model also runs on nuXmv. `FAIRNESS sched = 0/1` stops the scheduler from
+Peterson's mutual exclusion for two processes. `FAIRNESS sched = 0/1` stops the scheduler from
 starving a process. The frozen `BUGGY` drops the `turn` test from the entry
 guard.
 
@@ -65,6 +53,3 @@ guard.
 | `!BUGGY -> G (pc1 = want -> F pc1 = crit)` | true | no starvation |
 | `!BUGGY -> AG EF pc0 = crit` | true | no dead end |
 | `BUGGY -> EF AG !(pc0 = crit)` | true | without `turn`, both flags up livelocks — every state still has a successor, so it's not a deadlock |
-
-The last row is the point of the model: the flags alone are enough for
-mutual exclusion, and the `turn` variable is what buys liveness.

@@ -1,82 +1,85 @@
 # Volvo IT Process Mining
 
-Process mining and LTL verification over the BPI Challenge 2013 event logs
-(Volvo IT Belgium, VINST incident and problem management).
+Process mining and temporal-logic verification over the BPI Challenge 2013 event
+logs (Volvo IT Belgium, VINST incident and problem management), built with Gradio
+and pm4py.
 
-Formal Methods project, University of Bari. This folder is self-contained: copy
-it anywhere and it runs on its own.
+## Overview
 
-## Setup
+The dashboard discovers process models from the logs, measures how well each
+model matches the recorded behaviour, verifies temporal properties over every
+case, and reports where the time goes. This folder is self-contained: copy it
+anywhere and it runs on its own.
+
+### Key features
+
+- **Process discovery**: Alpha, Heuristics and Inductive miner, compared side by side
+- **Conformance checking**: fitness, precision, generalisation and simplicity
+- **Temporal verification**: eight shipped properties, or a formula you type,
+  evaluated over finite traces with counterexamples
+- **Performance analysis**: waiting times, case durations, variants, transition heatmap
+- **Assistant**: questions answered from the measured figures of the loaded log,
+  with OpenAI, Gemini or a local Ollama model
+
+## Installation
 
 Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and Graphviz
-(`sudo apt install graphviz` — pm4py shells out to `dot` to render Petri nets).
+(`sudo apt install graphviz`; pm4py shells out to `dot` to render Petri nets).
 
 ```bash
 uv sync --all-extras
 uv run python scripts/fetch_data.py   # downloads the three logs into data/raw/
-uv run pytest                         # 235 tests: the dashboard and the exercises
+uv run pytest                         # 267 tests
+uv run python -m volvo.main           # http://127.0.0.1:7860
 ```
 
-`uv sync` prunes whatever the named extras do not cover, so use `--all-extras`
-unless you know you want a narrower environment: `dev` carries pytest, `ai` the
-LLM providers the dashboard's analysis panels use, and `exercises` the state
-machine under `exercises/fsm/`. Installing only some of them removes the rest and
-the corresponding tests start failing.
-
-## Dashboard
+API keys are optional and can be passed as flags rather than written to disk:
 
 ```bash
-uv run python -m volvo.main
 uv run python -m volvo.main --openai-api-key sk-...   # or --gemini-api-key, --ollama-base-url
-uv run python -m volvo.main --host 0.0.0.0 --port 8080
 ```
 
-Then open http://127.0.0.1:7860.
+## Usage
 
-Keys are read from `.env` and the environment as before; the flags override both,
-which is the way to run it without writing a key to disk.
+1. **Data**: pick a log and an activity labelling.
+2. **Preprocessing**: filter by activity, time range or case length, drop
+   duplicates, relabel. Reload from the Data tab to undo.
+3. **Discovery** and **Conformance**: choose a miner, read the Petri net and the
+   four metrics.
+4. **LTL**: run a shipped property or type your own; violating cases come back as
+   counterexamples.
+5. **Analytics**, **Anomalies**, **Prediction**: health score, waiting times,
+   outliers, Markov successor probabilities.
+6. **Report** and **Assistant**: generate the analysis as Markdown, or ask about
+   the loaded log in natural language.
 
-## Scripts
+## Project structure
 
-```bash
-uv run python scripts/run_baseline.py      # compare discovery algorithms
 ```
-
-## Reports
-
-```bash
-uv run python scripts/run_report.py
+VolvoProcessMining/
+├── volvo/
+│   ├── domain.py          # log schemas and activity-label derivation
+│   ├── logs/              # attribute-preserving loading, filters
+│   ├── mining/            # discovery, conformance, performance
+│   ├── verification/      # temporal-logic encoding and property library
+│   ├── analysis/          # composite score, anomalies, Markov model
+│   ├── ai/                # LLM providers and the grounding fact block
+│   ├── ui/                # Gradio layout, callbacks, figures
+│   ├── reporting/         # Markdown report generation
+│   └── main.py            # command-line entry point
+├── scripts/               # fetch data; regenerate results, figures, tables, PDFs
+├── exercises/             # NuSMV, FSM and statechart coursework
+└── docs/
+    ├── report/documentation.pdf
+    ├── presentation/presentation.pdf
+    └── results/           # measured results for the write-up
 ```
-
-Writes one report per log to `docs/results/`. An LLM narrative section is added
-when a provider is available; everything else works without one.
-
-Three providers are supported. Copy `.env.example` to `.env` and fill in whichever
-you want; the dashboard lists the ones that are actually usable.
-
-**Local (recommended)** — no key, no billing, works offline:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2
-uv sync --extra ai
-```
-
-The first call takes about a minute while the model loads into VRAM; after that
-it answers in about a second.
-
-**Hosted**, for machines that cannot run a local model — set `OPENAI_API_KEY`
-(https://platform.openai.com/api-keys, billed per token) or `GEMINI_API_KEY`
-(https://aistudio.google.com/apikey, free tier available).
-
-When several are available the local one is chosen by default, so nothing is
-billed unless you pick a hosted provider explicitly.
 
 ## Dataset
 
-Three logs, all loading to their published counts — see `data/README.md`.
-The activity label is derived from Status + Sub Status; BPI 2013 has no activity
-column, and the choice of mode materially changes the discovered model.
+Three logs, all loading to their published counts. BPI 2013 has no activity
+column: the label is derived from Status + Sub Status, and the choice materially
+changes the discovered model.
 
 | Log | Cases | Events | Activities |
 |---|---|---|---|
@@ -86,98 +89,20 @@ column, and the choice of mode materially changes the discovered model.
 
 ## Exercises
 
-Three formal-methods exercises live under `exercises/`, independent of the dashboard
-and of each other. Each has its own README with the detail; below is how to run them.
-
-### `exercises/nusmv/` — symbolic model checking
-
-Three SMV models: two river-crossing and bridge-walking puzzles, solved by refuting a
-reachability property and reading the counterexample as the solution, and Peterson's
-mutual exclusion with safety, liveness under fairness, and a deliberately broken
-variant.
-
-Needs NuSMV, which is not packaged for Debian or Ubuntu — download the binary from
-<https://nusmv.fbk.eu/downloads.html> and either put it on `PATH` or point `NUSMV` at it.
-
-```bash
-./exercises/nusmv/check.sh                    # all three models
-./exercises/nusmv/check.sh peterson.smv       # one model
-NUSMV=/opt/NuSMV-2.6.0-Linux/bin/NuSMV ./exercises/nusmv/check.sh
-```
-
-Expect 15 specifications and no `WARNING` line. Two of them print `is false` on
-purpose: those are the refutations whose counterexample is the answer — the eleven
-crossings of the river, and the walk over all eight bridges.
-`exercises/nusmv/README.md` records the expected verdict for every specification, so a
-disagreement means a broken model rather than a stale table.
-
-### `exercises/fsm/` — a state machine driving an LLM
-
-A movie review assistant: each state carries a prompt, its declared transitions and,
-where it collects structured data, a response model. The model chooses the transition;
-the code decides what it does.
-
-```bash
-uv run python exercises/fsm/main.py --api-key sk-...
-uv run python exercises/fsm/main.py --api-key sk-... --model gpt-4o
-uv run pytest exercises/fsm -v                # 33 tests, no API key needed
-```
-
-The key may also come from `OPENAI_API_KEY` in the environment or in `.env`;
-`--api-key` beats both. Type `quit`, `exit` or Ctrl-C to end the conversation.
-Reviews are kept in `exercises/fsm/reviews.json`, one per film, and survive between
-runs. The state handlers need a live model and are not unit tested — the validation,
-the persistence and the pure helpers are.
-
-### `exercises/itemis/` — a statechart
-
-`Statechart.ysc`, a smart kitchen modelled in itemis CREATE (YAKINDU Statechart Tools).
-Nothing to run from this repository: open the folder as an Eclipse project in itemis
-CREATE and use its built-in simulator. `exercises/itemis/README.md` describes the four
-orthogonal regions and the events that drive them.
-
-## Layout
-
-| Path | Role |
-|---|---|
-| `volvo/config.py` | Paths and API keys — no domain knowledge |
-| `volvo/domain.py` | Declared log schemas and activity-label derivation |
-| `volvo/logs/` | Attribute-preserving loading into an `EventLogBundle`, and filters |
-| `volvo/mining/` | Discovery, conformance, algorithm comparison, performance |
-| `volvo/verification/` | LTLf encoding and evaluation, and the shipped property library |
-| `volvo/analysis/` | Composite score, anomalies, Markov transition model |
-| `volvo/ai/` | LLM providers and the fact block the assistant is grounded in |
-| `volvo/ui/` | Gradio layout, callbacks, Plotly figures |
-| `volvo/reporting/` | Markdown report generation |
-| `volvo/main.py` | Command-line entry point |
-| `scripts/` | Fetch the data; regenerate every result, figure, table and PDF |
-| `docs/results/` | Measured results for the write-up |
-
-How it fits together is documented in the report: `docs/report/documentation.pdf`,
-section *Implementation*.
-
-pm4py is AGPL v3.
+Three independent coursework exercises under `exercises/`, each with its own
+README: `nusmv/` (symbolic model checking of two puzzles and Peterson's mutual
+exclusion), `fsm/` (a state machine driving an LLM), and `itemis/` (a smart
+kitchen statechart).
 
 ## Deliverables
 
-`docs/report/documentation.pdf` and `docs/presentation/presentation.pdf`.
+`docs/report/documentation.pdf` and `docs/presentation/presentation.pdf`. Every
+table and figure in both is generated from the analysis code, so the documents
+cannot drift from the results. Rebuild them with
+`uv run python scripts/build_all.py`, which needs a LaTeX toolchain
+(`sudo apt install texlive-latex-recommended texlive-fonts-recommended latexmk`).
 
-Every table and figure in both is generated from the analysis code — no measured
-value is transcribed by hand, so the documents cannot drift from the results.
+## Author
 
-Rebuild the figures, tables and PDFs:
-
-```bash
-uv run python scripts/build_all.py
-```
-
-That regenerates `docs/figures/` and `docs/tables/`, then builds both PDFs. It
-does not refresh `docs/results/*.md` — those scripts only print to stdout, and
-`discovery-baseline.md` carries a hand-written preamble that a naive redirect
-would clobber. Refresh them individually, e.g.
-`uv run python scripts/run_verification.py > docs/results/ltl-verification.md`.
-It needs a LaTeX toolchain:
-
-```bash
-sudo apt install texlive-latex-recommended texlive-fonts-recommended latexmk
-```
+**Francesco Sgaramella**
+University of Bari "Aldo Moro"

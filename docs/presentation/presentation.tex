@@ -16,57 +16,26 @@
 
 \newcommand{\act}[1]{\texttt{\small #1}}
 
-\title[Process Mining --- BPI 2013]{Process Mining and Formal Verification\\
+\title[Process Mining, BPI 2013]{Process Mining and Formal Verification\\
        of the Volvo IT Incident Process}
 \subtitle{BPI Challenge 2013}
-\author{Formal Methods}
+\author{Francesco Sgaramella}
 \date{\today}
 
 \begin{document}
 
 \frame{\titlepage}
 
-\begin{frame}{Route through the analysis}
-\begin{columns}[T]
-\begin{column}{0.52\textwidth}
-\tableofcontents
-\end{column}
-\begin{column}{0.44\textwidth}
-\small
-Three findings are argued for:
-\begin{itemize}
-  \item rework dominates the process;
-  \item the documented procedure is not the executed one;
-  \item one classical algorithm is inapplicable here, for a reason theory
-        predicts.
-\end{itemize}
-\end{column}
-\end{columns}
-\end{frame}
 
 \section{Context}
 
-\begin{frame}{Process mining in one slide}
-An information system records every state change it performs. That record is an
-\emph{event log}: for each case, a finite sequence of \emph{(case, activity,
-timestamp)} events.
-\bigskip
-\begin{description}
-  \item[Discovery] derive a model --- here a Petri net --- from the log alone.
-  \item[Conformance] measure how well a model and a log agree.
-  \item[Verification] decide whether a stated property holds of every case.
-\end{description}
-\bigskip
-A designed model says how work \emph{should} proceed. A discovered model says
-how it \emph{did}. The gap between them is the object of study.
-\end{frame}
 
 \begin{frame}{The question}
 \begin{itemize}
   \item An IT service desk records every state change of every incident.
   \item The process is \emph{documented}. What was actually \emph{executed}?
   \bigskip
-  \item Volvo IT Belgium, VINST system, 2010--2012.
+  \item Volvo IT Belgium, VINST system, 2010 to 2012.
   \item Three logs: incidents, open problems, closed problems.
   \item A standard benchmark, so the results are comparable with the literature.
   \bigskip
@@ -81,7 +50,7 @@ how it \emph{did}. The gap between them is the object of study.
 \begin{center}\small\input{../tables/dataset.tex}\end{center}
 \bigskip
 \small
-Case and event counts reproduce the published figures exactly --- the first
+Case and event counts reproduce the published figures exactly, the first
 check on the loader.
 \bigskip
 
@@ -90,13 +59,6 @@ differs by an order of magnitude and their alphabet is smaller. The incident log
 is the object of study; the other two are used for comparison.
 \end{frame}
 
-\begin{frame}{One activity carries the process}
-\begin{center}
-\includegraphics[height=0.68\textheight]{activity_frequency.png}
-\end{center}
-\act{Accepted+In Progress} is the plurality of all events --- the first hint
-that this process spends its time repeating itself.
-\end{frame}
 
 \begin{frame}{There is no activity column}
 The dataset records \act{Status} and \act{Sub Status}. What counts as an
@@ -104,13 +66,13 @@ activity is the analyst's decision.
 \bigskip
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}
-\textbf{\act{Status}} --- 4 activities\\[0.3em]
+\textbf{\act{Status}}: 4 activities\\[0.3em]
 \act{Accepted}, \act{Queued}, \act{Completed}, \act{Unmatched}\\[0.6em]
 Small models. Waiting on a vendor and waiting on a user become
 indistinguishable.
 \end{column}
 \begin{column}{0.48\textwidth}
-\textbf{\act{Status+Sub Status}} --- 13 activities\\[0.3em]
+\textbf{\act{Status+Sub Status}}: 13 activities\\[0.3em]
 \act{Accepted+In Progress}, \act{Accepted+Wait - User}, \dots\\[0.6em]
 Three times larger models, lower precision, and the real process.
 \end{column}
@@ -121,26 +83,6 @@ Treated as a parameter of the loader, not fixed silently. Both are reported.
 \end{center}
 \end{frame}
 
-\begin{frame}{The same miner, the same log, two models}
-\begin{columns}[c]
-\begin{column}{0.46\textwidth}
-\begin{center}
-\includegraphics[width=0.85\textwidth]{petri_alpha_status.png}\\[0.4em]
-\small \act{Status} --- 4 labels
-\end{center}
-\end{column}
-\begin{column}{0.46\textwidth}
-\begin{center}
-\includegraphics[height=0.62\textheight]{petri_alpha_status_substatus.png}\\[0.4em]
-\small \act{Status+Sub Status} --- 13 labels
-\end{center}
-\end{column}
-\end{columns}
-\bigskip
-\begin{center}
-\small The labelling decision is not cosmetic. It is the decision.
-\end{center}
-\end{frame}
 
 \section{Discovery}
 
@@ -155,66 +97,34 @@ Treated as a parameter of the loader, not fixed silently. Both are reported.
 \end{description}
 \bigskip
 All three are run on the full incident log, under both labellings, from the same
-loaded bundle --- so the six rows on the next slides differ only in the
+loaded bundle, so the six rows on the next slides differ only in the
 algorithm and the labelling.
 \end{frame}
 
-\begin{frame}{Four dimensions, not one}
-\begin{description}
-  \item[Fitness] Can the model replay what happened?
-  \item[Precision] Does it forbid what never happened?
-  \item[Generalisation] Will it hold for future cases?
-  \item[Simplicity] Can a human read it?
-\end{description}
-\bigskip
-They trade off. Maximising any one alone is trivial ---
-a model permitting everything fits perfectly and explains nothing; a model
-enumerating the observed traces is perfectly precise and predicts nothing.
-\bigskip
-Hence a table, not a winner.
-\end{frame}
 
 \begin{frame}{Discovery results}
 \begin{center}\scriptsize\input{../tables/discovery.tex}\end{center}
 \bigskip
 \small
+Four dimensions, and they trade off: fitness (can the model replay the log?),
+precision (does it forbid what never happened?), generalisation and simplicity.
 Inductive buys perfect fitness with permissiveness and the largest net.
 Heuristics gives the best balance. Alpha collapses.
 \bigskip
 
 Moving from 4 labels to 13 lowers precision for every algorithm and roughly
-triples the net --- there is simply more distinct behaviour to explain.
+triples the net: there is simply more distinct behaviour to explain.
 \end{frame}
 
 \begin{frame}{What the two usable miners produce}
 \begin{center}
 \includegraphics[width=0.66\textwidth]{petri_heuristics_status.png}\\[0.2em]
-{\scriptsize Heuristics --- 8 places, 15 transitions}\\[0.2em]
+{\scriptsize Heuristics: 8 places, 15 transitions}\\[0.2em]
 \includegraphics[width=0.66\textwidth]{petri_inductive_status.png}\\[0.2em]
-{\scriptsize Inductive --- 17 places, 23 transitions, plus silent routing}
+{\scriptsize Inductive: 17 places, 23 transitions, plus silent routing}
 \end{center}
 \end{frame}
 
-\begin{frame}{Thirteen labels, and the net stops being readable}
-\begin{columns}[c]
-\begin{column}{0.48\textwidth}
-\begin{center}
-\includegraphics[width=\textwidth]{petri_heuristics_status_substatus.png}\\[0.3em]
-{\small Heuristics --- 27 places, 69 transitions}
-\end{center}
-\end{column}
-\begin{column}{0.48\textwidth}
-\begin{center}
-\includegraphics[width=\textwidth]{petri_inductive_status_substatus.png}\\[0.3em]
-{\small Inductive --- 57 places, 78 transitions}
-\end{center}
-\end{column}
-\end{columns}
-\bigskip
-\begin{center}
-\small Simplicity is a conformance dimension for a reason.
-\end{center}
-\end{frame}
 
 \begin{frame}{Why Alpha collapses}
 \begin{columns}[T]
@@ -223,7 +133,7 @@ Fitness below $0.15$; the net degenerates to two places.
 \bigskip
 \textbf{This is not a bug.}
 \bigskip
-90\% of cases contain a \emph{length-one loop} --- an activity immediately
+90\% of cases contain a \emph{length-one loop}, an activity immediately
 repeated.
 \bigskip
 Alpha infers contradictory ordering relations from a directly-follows pair
@@ -240,42 +150,16 @@ A known theoretical boundary, demonstrated on a real log.
 \section{Time}
 
 \begin{frame}{Where does the time go?}
-\begin{center}\includegraphics[width=0.77\textwidth]{waiting_times.png}\end{center}
-\smallskip
+\begin{center}\includegraphics[width=0.66\textwidth]{waiting_times.png}\end{center}
 \small
-The \act{Wait} states dominate. Delay is \emph{external} to the service desk.
+The \act{Wait} states dominate: delay is \emph{external} to the service desk.
+Where mean and median diverge (\act{Accepted+In Progress} is minutes at the
+median, hours at the mean) work is normally picked up at once and
+occasionally stalls for months. Either figure alone misleads.
 \end{frame}
 
-\begin{frame}{The same result in numbers}
-\begin{center}\scriptsize\input{../tables/waiting.tex}\end{center}
-\vspace{-0.2em}
-\begin{center}
-\small Waiting time is the interval to the next event of the same case; last
-events are excluded, not counted as zero.
-\end{center}
-\end{frame}
 
-\begin{frame}{Never trust the mean alone}
-\act{Accepted+In Progress}: median waiting time in \textbf{minutes}, mean in
-\textbf{hours}, maximum in \textbf{months}.
-\bigskip
-\begin{itemize}
-  \item Work is normally picked up immediately.
-  \item Occasionally it stalls for a very long time.
-  \item The mean alone says ``slow activity''. The median alone hides the stalls.
-\end{itemize}
-\bigskip
-Both are reported everywhere in this analysis, and so is the maximum.
-\end{frame}
 
-\begin{frame}{How long a case lasts}
-\begin{center}
-\includegraphics[height=0.66\textheight]{duration_hist.png}
-\end{center}
-\small
-Heavy-tailed at the case level too: most incidents close quickly, a minority
-runs for months. The same shape as the waiting times, one level up.
-\end{frame}
 
 \begin{frame}{A weakly standardised process}
 \begin{columns}[T]
@@ -295,18 +179,6 @@ precision figures are the correct result.
 
 \section{Verification}
 
-\begin{frame}{Temporal logic over \emph{finite} traces}
-A case is a finite sequence of events, so the semantics are $\text{LTL}_f$.
-\bigskip
-\begin{align*}
-  \pi, i \models \mathbf{F}\varphi &\iff \exists j \geq i.\ \pi, j \models \varphi \\
-  \pi, i \models \mathbf{G}\varphi &\iff \forall j \geq i.\ \pi, j \models \varphi \\
-  \pi, i \models \mathbf{X}\varphi &\iff i+1 < n \ \textbf{and}\ \pi, i{+}1 \models \varphi
-\end{align*}
-\bigskip
-\alert{$\mathbf{X}$ is \emph{strong}: false at the last position.} Remember this
-for two slides' time.
-\end{frame}
 
 \begin{frame}{The property library}
 Eight properties, each a real formula evaluated per case.
@@ -336,22 +208,10 @@ The size of the gap is the result.
 \end{center}
 \end{frame}
 
-\begin{frame}{Reading the table}
-\begin{itemize}
-  \item \textbf{Cases do not disappear.} Termination, resolution and recovery
-        from \act{Wait - User} each hold for essentially every case.
-  \item \textbf{Closure is not universal.} A quarter of worked incidents never
-        reach \act{Completed+Closed}; they settle as \act{Completed+In Call}.
-        Defect or undocumented route --- the analysis establishes only that both
-        exist at scale.
-  \item \textbf{Queueing before work all but never happens.} The one property
-        stating the documented procedure is the one that fails.
-\end{itemize}
-\end{frame}
 
 \section{Findings}
 
-\begin{frame}{Finding 1 --- rework dominates}
+\begin{frame}{Finding 1: rework dominates}
 \begin{center}
 \Large
 Fewer than half of all events are the \emph{first} occurrence\\
@@ -361,25 +221,13 @@ of their activity within the case.
 \begin{itemize}
   \item Over half of all recorded work is repetition.
   \item Completion is near perfect; variability is moderate.
-  \item Rework is the single component dragging the score down --- and the
-        largest available lever.
+  \item Rework is the single component dragging the composite score down,
+        and the largest available lever.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{One score, and what it is made of}
-\begin{center}\small\input{../tables/health.tex}\end{center}
-\bigskip
-\small
-Four normalised components: completion, first-occurrence share, one minus the
-variant ratio, and throughput against a fixed horizon.
-\bigskip
 
-The weights and the horizon are \emph{stipulated}. The components are
-meaningful; the aggregate only comparatively --- and comparison is what it is
-used for.
-\end{frame}
-
-\begin{frame}{Finding 2 --- push to front}
+\begin{frame}{Finding 2: push to front}
 \begin{center}
 \Large
 $(\neg\,\textit{in\_progress}) \ \mathbf{U}\ \textit{queued}$ \quad holds for a
@@ -389,73 +237,13 @@ small minority of cases.
 \begin{itemize}
   \item The documented procedure: queue the incident, then work it.
   \item What happens: work begins without the incident ever being queued.
-  \item Established by \emph{formal verification over every case} --- not by
+  \item Established by \emph{formal verification over every case}, not by
         sampling, not by eyeballing variants.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{The same pattern in the transitions}
-\begin{columns}[c]
-\begin{column}{0.52\textwidth}
-\begin{center}
-\includegraphics[height=0.72\textheight]{transition_heatmap.png}
-\end{center}
-\end{column}
-\begin{column}{0.44\textwidth}
-\small
-Directly-follows frequencies, normalised per row: given this activity, what
-comes next?
-\bigskip
 
-One column absorbs nearly every row --- \act{Accepted+In Progress}. Work is what
-follows everything.
-\bigskip
 
-The \act{Queued+Awaiting Assignment} \emph{column} stays faint: almost nothing
-flows \emph{into} the queue. Push to front, visible without a formula.
-\end{column}
-\end{columns}
-\end{frame}
-
-\begin{frame}{Two methods, one conclusion}
-\begin{columns}[T]
-\begin{column}{0.48\textwidth}
-\textbf{Verification}\\[0.4em]
-$\mathbf{G}(\textit{closed} \rightarrow \neg\mathbf{F}\,\textit{in\_progress})$
-fails for a set of cases: work resumes after formal closure.
-\end{column}
-\begin{column}{0.48\textwidth}
-\textbf{Performance}\\[0.4em]
-\act{Completed+Closed} appears in the waiting-time table at all --- meaning
-closure events that were \emph{not} the last event of their case.
-\end{column}
-\end{columns}
-\bigskip\bigskip
-\begin{center}
-Independent methods agreeing is stronger than either alone.
-\end{center}
-\end{frame}
-
-\begin{frame}{The strong-\texorpdfstring{$\mathbf{X}$}{X} trap}
-Written the natural infinite-trace way:
-\[
-  \mathbf{G}(\textit{closed} \rightarrow \mathbf{X}\,\mathbf{G}\,\neg\,\textit{in\_progress})
-  \quad\Longrightarrow\quad \alert{26.2\%}
-\]
-Written without the next operator:
-\[
-  \mathbf{G}(\textit{closed} \rightarrow \neg\mathbf{F}\,\textit{in\_progress})
-  \quad\Longrightarrow\quad \textbf{98.4\%}
-\]
-\bigskip
-Most cases \emph{end} with \act{Completed+Closed}. $\mathbf{X}$ is false there,
-so every such case falsifies the first formula for reasons having nothing to do
-with Volvo IT.
-\bigskip
-\begin{center}
-A factor of four apart. Only one of them is about the process.
-\end{center}
-\end{frame}
 
 \section{Implementation}
 
@@ -466,7 +254,7 @@ A factor of four apart. Only one of them is about the process.
 \begin{description}
   \item[\texttt{logs}] loading, schema detection, filters
   \item[\texttt{mining}] discovery, conformance, performance
-  \item[\texttt{verification}] $\text{LTL}_f$ per trace
+  \item[\texttt{verification}] temporal logic per trace
   \item[\texttt{analysis}] score, anomalies, prediction
 \end{description}
 \smallskip
@@ -476,9 +264,9 @@ on \texttt{ui}.
 \begin{column}{0.46\textwidth}
 \textbf{Consequences}
 \begin{itemize}
-  \item Every function takes a loaded log and returns a value --- no module
+  \item Every function takes a loaded log and returns a value: no module
         state, no cache
-  \item Dashboard callbacks are plain functions, called directly by 202 tests
+  \item Dashboard callbacks are plain functions, called directly by 211 tests
   \item Two browser sessions are independent
   \item Every table and figure on these slides is generated from code
 \end{itemize}
@@ -486,19 +274,52 @@ on \texttt{ui}.
 \end{columns}
 \end{frame}
 
-\begin{frame}{Two decisions worth defending}
-\textbf{The loader adds columns; it never drops any.}\\
-Normalisation \emph{adds} the XES-standard names to a copy of the raw frame. The
-support-line, ownership and country attributes survive --- reducing each event to
-three columns, as is common, would make them unrecoverable without reparsing.
-\bigskip
 
-\textbf{A named property is not a special case.}\\
-The eight properties are declared as data --- name, formula, measured ratio ---
-and evaluated by the same function that evaluates a formula typed into the
-dashboard. The recorded ratios are asserted by the test suite, so a change that
-moved a published figure would fail the build rather than quietly update the
-report.
+\begin{frame}{It is one application, not a folder of scripts}
+Everything shown in this talk is reachable from a single Gradio dashboard,
+started with one command:
+\bigskip
+\begin{center}
+\texttt{uv run python -m volvo.main}
+\end{center}
+\bigskip
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Eight tabs}
+\begin{description}
+  \item[Data] load a log, choose the activity label
+  \item[Preprocessing] filters, deduplication
+  \item[Discovery] miner, threshold, Petri net
+  \item[Conformance] the four dimensions
+\end{description}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{\phantom{Eight tabs}}
+\begin{description}
+  \item[LTL] the shipped properties, or your own
+  \item[Analytics] waiting times, variants, score
+  \item[Report] the document, generated
+  \item[Assistant] questions in natural language
+\end{description}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{What the dashboard lets you do}
+\begin{itemize}
+  \item \textbf{Change the labelling and rediscover.} The \act{Status} against
+        \act{Status+Sub Status} comparison is two clicks, not two scripts.
+  \item \textbf{Type a formula.} The LTL box accepts an arbitrary
+        temporal-logic property over the activity alphabet and evaluates it
+        against every case, returning violating cases as counterexamples. The
+        eight shipped properties use that same code path.
+  \item \textbf{Swap the miner and the threshold} and watch precision and net
+        size move together.
+  \item \textbf{Generate the report} and ask the assistant about the loaded log,
+        with OpenAI, Gemini or a local Ollama model, or none at all.
+\end{itemize}
+\bigskip
+State lives per browser session, so two people using it do not collide.
 \end{frame}
 
 \begin{frame}{Threats to validity}
@@ -518,14 +339,14 @@ report.
 
 \begin{frame}{Conclusions}
 \begin{enumerate}
-  \item \textbf{Rework dominates} --- over half of recorded work is repetition.
-  \item \textbf{Documented $\neq$ executed} --- push-to-front proved formally
+  \item \textbf{Rework dominates}: over half of recorded work is repetition.
+  \item \textbf{Documented $\neq$ executed}: push-to-front proved formally
         over every case.
-  \item \textbf{Alpha is inapplicable here} --- predicted by length-one loops,
+  \item \textbf{Alpha is inapplicable here}: predicted by length-one loops,
         not an empirical surprise.
 \end{enumerate}
 \bigskip
-\textbf{Next:} the organisational attributes are already loaded --- handover
+\textbf{Next:} the organisational attributes are already loaded. Handover
 analysis across support lines, push-to-front quantified by organisation, and
 incident versus problem as interacting processes.
 \end{frame}

@@ -11,6 +11,12 @@ MODES = list(get_args(ActivityMode))
 TITLE = "Volvo IT Process Mining"
 
 
+def refresh_activities(bundle):
+    """Repopulates both activity pickers after the loaded log changes."""
+    choices = handlers.activity_choices(bundle)
+    return gr.Dropdown(choices=choices, value=[]), gr.Dropdown(choices=choices, value=None)
+
+
 def build() -> gr.Blocks:
     with gr.Blocks(title=TITLE) as demo:
         bundle = gr.State(None)
@@ -27,24 +33,35 @@ def build() -> gr.Blocks:
             with gr.Row():
                 data_table = gr.Dataframe(label="Activity counts")
                 data_plot = gr.Plot()
-            load_button.click(
-                handlers.load_log,
-                inputs=[log_name, mode],
-                outputs=[bundle, data_summary, data_table, data_plot],
-            )
 
         with gr.Tab("Preprocessing"):
-            gr.Markdown("Filters return a new log; reload from the Data tab to undo.")
+            gr.Markdown(
+                "Filters return a new log; reload from the Data tab to undo. They "
+                "compose in a fixed order: activities, time range, case length, "
+                "duplicates, relabelling."
+            )
+            with gr.Row():
+                prep_activities = gr.Dropdown(
+                    [], multiselect=True, label="Activities", scale=3
+                )
+                activity_action = gr.Radio(
+                    ["keep", "exclude"], value="keep", label="Chosen activities"
+                )
+            with gr.Row():
+                start_date = gr.Textbox(label="From", placeholder="2012-03-01")
+                end_date = gr.Textbox(label="To", placeholder="2012-06-30")
             with gr.Row():
                 min_events = gr.Slider(1, 50, value=1, step=1, label="Minimum events per case")
+                max_events = gr.Number(label="Maximum events per case", precision=0)
                 drop_dupes = gr.Checkbox(label="Drop duplicate events")
-            prep_button = gr.Button("Apply")
-            prep_summary = gr.Markdown()
-            prep_button.click(
-                handlers.apply_preprocessing,
-                inputs=[bundle, min_events, drop_dupes],
-                outputs=[bundle, prep_summary],
+            relabelling = gr.Textbox(
+                label="Relabelling",
+                lines=3,
+                placeholder="Accepted+In Progress = Working\nQueued+Awaiting Assignment = Waiting",
+                info="One `old = new` per line. Unlisted activities keep their label.",
             )
+            prep_button = gr.Button("Apply", variant="primary")
+            prep_summary = gr.Markdown()
 
         with gr.Tab("Discovery"):
             with gr.Row():
@@ -124,6 +141,62 @@ def build() -> gr.Blocks:
                 ],
             )
 
+        with gr.Tab("Anomalies"):
+            gr.Markdown("Statistical outliers. Every threshold is a modelling choice.")
+            with gr.Row():
+                length_std = gr.Slider(
+                    0.5, 4.0, value=2.0, step=0.1, label="Case length (standard deviations)"
+                )
+                rare_pct = gr.Slider(
+                    0.1, 5.0, value=1.0, step=0.1, label="Rare activity (% of events)"
+                )
+            with gr.Row():
+                wait_hours = gr.Slider(1, 720, value=24, step=1, label="Long wait (hours)")
+                min_support = gr.Slider(
+                    2, 20, value=2, step=1, label="Rare transition (fewer than N)"
+                )
+            anomaly_button = gr.Button("Detect", variant="primary")
+            anomaly_text = gr.Markdown()
+            with gr.Row():
+                length_table = gr.Dataframe(label="Unusual case lengths")
+                rare_table = gr.Dataframe(label="Rare activities")
+            with gr.Row():
+                wait_table = gr.Dataframe(label="Long waits")
+                transition_table = gr.Dataframe(label="Rare transitions")
+            anomaly_button.click(
+                handlers.run_anomalies,
+                inputs=[bundle, length_std, rare_pct, wait_hours, min_support],
+                outputs=[
+                    anomaly_text, length_table, rare_table, wait_table, transition_table,
+                ],
+            )
+
+        with gr.Tab("Prediction"):
+            gr.Markdown(
+                "A first-order Markov model over the loaded log: the next activity "
+                "depends on the current one alone, so a long walk is indicative, not a "
+                "forecast."
+            )
+            predict_activity = gr.Dropdown([], label="Current activity")
+            with gr.Row():
+                top_k = gr.Slider(1, 10, value=3, step=1, label="Successors shown")
+                walk_length = gr.Slider(2, 20, value=5, step=1, label="Sequence length")
+            with gr.Row():
+                next_button = gr.Button("Predict next", variant="primary")
+                sequence_button = gr.Button("Predict sequence")
+            predict_text = gr.Markdown()
+            predict_table = gr.Dataframe(label="Successor probabilities")
+            next_button.click(
+                handlers.predict_next,
+                inputs=[bundle, predict_activity, top_k],
+                outputs=[predict_text, predict_table],
+            )
+            sequence_button.click(
+                handlers.predict_sequence,
+                inputs=[bundle, predict_activity, walk_length],
+                outputs=[predict_text],
+            )
+
         with gr.Tab("Report"):
             with gr.Row():
                 report_provider = gr.Dropdown(
@@ -169,10 +242,21 @@ def build() -> gr.Blocks:
             )
             clear_button.click(lambda: [], outputs=[transcript])
 
-        demo.load(
-            handlers.load_log,
-            inputs=[log_name, mode],
-            outputs=[bundle, data_summary, data_table, data_plot],
+        activity_pickers = [prep_activities, predict_activity]
+        load_outputs = [bundle, data_summary, data_table, data_plot]
+        prep_inputs = [
+            bundle, prep_activities, activity_action, start_date, end_date,
+            min_events, max_events, drop_dupes, relabelling,
+        ]
+
+        load_button.click(handlers.load_log, [log_name, mode], load_outputs).then(
+            refresh_activities, bundle, activity_pickers
+        )
+        prep_button.click(
+            handlers.apply_preprocessing, prep_inputs, [bundle, prep_summary]
+        ).then(refresh_activities, bundle, activity_pickers)
+        demo.load(handlers.load_log, [log_name, mode], load_outputs).then(
+            refresh_activities, bundle, activity_pickers
         )
 
     return demo

@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
+from volvo.logs.loader import ACTIVITY
 from volvo.ui import charts, handlers
 from volvo.tests.test_anomalies import build
 
@@ -134,8 +135,24 @@ def test_run_analytics_returns_three_figures():
     assert all(isinstance(f, go.Figure) for f in figures)
 
 
+def preprocess(bundle, **overrides):
+    """apply_preprocessing with every filter neutral unless overridden."""
+    kwargs = {
+        "activities": [],
+        "activity_action": "keep",
+        "start": "",
+        "end": "",
+        "min_events": 1,
+        "max_events": None,
+        "dedupe": False,
+        "relabelling": "",
+    }
+    kwargs.update(overrides)
+    return handlers.apply_preprocessing(bundle, **kwargs)
+
+
 def test_apply_preprocessing_filters_and_reports():
-    bundle, text = handlers.apply_preprocessing(build({"short": "P", "long": "PQC"}), 2, False)
+    bundle, text = preprocess(build({"short": "P", "long": "PQC"}), min_events=2)
 
     assert bundle.summary()["unique_cases"] == 1
     assert "3 events" in text
@@ -144,14 +161,160 @@ def test_apply_preprocessing_filters_and_reports():
 def test_apply_preprocessing_keeps_the_log_when_a_filter_empties_it():
     original = build({"1": "PC"})
 
-    bundle, text = handlers.apply_preprocessing(original, 50, False)
+    bundle, text = preprocess(original, min_events=50)
 
     assert bundle is original
     assert text.startswith("**Error:**")
 
 
 def test_apply_preprocessing_refuses_a_missing_log():
-    assert handlers.apply_preprocessing(None, 1, False) == (None, handlers.NO_LOG)
+    assert preprocess(None) == (None, handlers.NO_LOG)
+
+
+def test_apply_preprocessing_without_a_filter_is_a_no_op():
+    original = build({"1": "PQC", "2": "PC"})
+
+    bundle, _ = preprocess(original)
+
+    assert bundle.summary()["total_events"] == original.summary()["total_events"]
+
+
+def test_apply_preprocessing_caps_case_length():
+    bundle, _ = preprocess(build({"1": "PQC", "2": "PC"}), max_events=2)
+
+    assert bundle.summary()["unique_cases"] == 1
+
+
+def test_apply_preprocessing_keeps_only_the_chosen_activities():
+    bundle, _ = preprocess(
+        build({"1": "PQC"}), activities=["Accepted+In Progress"], activity_action="keep"
+    )
+
+    assert bundle.df[ACTIVITY].unique().tolist() == ["Accepted+In Progress"]
+
+
+def test_apply_preprocessing_excludes_the_chosen_activities():
+    bundle, _ = preprocess(
+        build({"1": "PQC"}), activities=["Accepted+In Progress"], activity_action="exclude"
+    )
+
+    assert "Accepted+In Progress" not in bundle.df[ACTIVITY].tolist()
+
+
+def test_apply_preprocessing_filters_a_time_range():
+    bundle, _ = preprocess(build({"1": "PQC"}, gap_hours=24), start="2013-01-02")
+
+    assert bundle.summary()["total_events"] == 2
+
+
+def test_apply_preprocessing_drops_duplicate_events():
+    original = build({"1": "PC"})
+    doubled = replace(original, df=pd.concat([original.df, original.df], ignore_index=True))
+
+    bundle, _ = preprocess(doubled, dedupe=True)
+
+    assert bundle.summary()["total_events"] == 2
+
+
+def test_apply_preprocessing_relabels_activities():
+    bundle, _ = preprocess(build({"1": "PC"}), relabelling="Accepted+In Progress = Working")
+
+    assert "Working" in bundle.df[ACTIVITY].tolist()
+
+
+def test_apply_preprocessing_reports_a_malformed_relabelling():
+    original = build({"1": "PC"})
+
+    bundle, text = preprocess(original, relabelling="Accepted+In Progress")
+
+    assert bundle is original
+    assert text.startswith("**Error:**")
+
+
+def test_parse_relabelling_ignores_blank_lines():
+    assert handlers.parse_relabelling("\n a = b \n\n") == {"a": "b"}
+
+
+def test_parse_relabelling_keeps_the_first_separator_only():
+    assert handlers.parse_relabelling("a = b = c") == {"a": "b = c"}
+
+
+def test_parse_relabelling_rejects_an_empty_source():
+    with pytest.raises(ValueError):
+        handlers.parse_relabelling(" = b")
+
+
+def test_activity_choices_lists_the_loaded_activities():
+    assert handlers.activity_choices(build({"1": "PC"})) == [
+        "Accepted+In Progress",
+        "Completed+Closed",
+    ]
+
+
+def test_activity_choices_without_a_log_is_empty():
+    assert handlers.activity_choices(None) == []
+
+
+def test_run_anomalies_returns_four_tables():
+    text, *tables = handlers.run_anomalies(
+        build({"1": "PQC", "2": "PC", "3": "P"}), 2.0, 50.0, 0.5, 2
+    )
+
+    assert "anomal" in text.lower()
+    assert len(tables) == 4
+    assert all(isinstance(t, pd.DataFrame) for t in tables)
+
+
+def test_run_anomalies_finds_a_long_wait():
+    _, _, _, waits, _ = handlers.run_anomalies(build({"1": "PQC"}, gap_hours=48), 2.0, 1.0, 24.0, 2)
+
+    assert not waits.empty
+    assert waits["wait_hours"].max() >= 48
+
+
+def test_run_anomalies_refuses_a_missing_log():
+    assert handlers.run_anomalies(None, 2.0, 1.0, 24.0, 2)[0] == handlers.NO_LOG
+
+
+def test_predict_next_ranks_successors():
+    text, table = handlers.predict_next(build({"1": "PQC", "2": "PC"}), "Accepted+In Progress", 3)
+
+    assert not table.empty
+    assert set(table.columns) == {"activity", "probability"}
+    assert table["probability"].sum() == pytest.approx(1.0)
+    assert "Accepted+In Progress" in text
+
+
+def test_predict_next_reports_an_unknown_activity():
+    text, table = handlers.predict_next(build({"1": "PC"}), "Nowhere+At All", 3)
+
+    assert text.startswith("**Error:**")
+    assert table.empty
+
+
+def test_predict_next_on_a_terminal_activity_returns_nothing():
+    text, table = handlers.predict_next(build({"1": "PC"}), "Completed+Closed", 3)
+
+    assert table.empty
+    assert "no successor" in text.lower()
+
+
+def test_predict_sequence_walks_the_likeliest_path():
+    text = handlers.predict_sequence(build({"1": "PQC", "2": "PQC"}), "Accepted+In Progress", 3)
+
+    assert "Queued+Awaiting Assignment" in text
+    assert "Completed+Closed" in text
+
+
+def test_predict_sequence_reports_an_unknown_activity():
+    text = handlers.predict_sequence(build({"1": "PC"}), "Nowhere+At All", 3)
+
+    assert text.startswith("**Error:**")
+
+
+def test_prediction_handlers_refuse_a_missing_log():
+    assert handlers.predict_next(None, "Accepted+In Progress", 3)[0] == handlers.NO_LOG
+    assert handlers.predict_sequence(None, "Accepted+In Progress", 3) == handlers.NO_LOG
 
 
 def test_provider_choices_always_offer_none():
