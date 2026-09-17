@@ -1,27 +1,21 @@
-# Smart kitchen statechart
+# Smart Kitchen Statechart
 
-An event-driven statechart of a smart kitchen, modelled in itemis CREATE. `Statechart.ysc` is the model; the Eclipse project metadata is
-`.project`.
+An event-driven statechart modeling an automated smart kitchen environment, designed in itemis CREATE. The model is defined in `Statechart.ysc` with corresponding project metadata in `.project`.
 
+## System Structure
 
-## Structure
+The root state `SmartHome` encloses a composite state `SmartKitchen` divided into four concurrent orthogonal regions:
 
-One top-level state, `SmartHome`, holds a single composite state `SmartKitchen` split
-into **four orthogonal regions that run concurrently**. Each screenshot shows one of
-them.
-
-| Region | Screenshot | States |
+| Region | Diagram Reference | Active States |
 |---|---|---|
 | Lights | `01-lights-region.png` | `LightsOff`, `LightsOn`, `LightOnSmoke` |
 | InductionCooktop | `02-induction-cooktop-region.png` | `CooktopOff`, `CooktopOn` (`CooktopHeating`, `CooktopStable`, `CooktopCooling`) |
 | SmokeDetector | `03-smoke-detector-region.png` | `SmokeDetectorNormal`, `SmokeDetectorAlert` |
 | KitchenHood | `04-kitchen-hood-region.png` | `KitchenHoodOff`, `KitchenHoodOn` (`KitchenHoodOnLow`, `KitchenHoodOnHigh`) |
 
-The regions share no variables and call no operations on each other. They coordinate
-only by reacting to the same broadcast events: `smokeDetected` is handled
-simultaneously by Lights, InductionCooktop and SmokeDetector.
+The four regions operate independently without shared state variables or cross-region operation calls. Coordination occurs strictly via broadcast events; for instance, a `smokeDetected` event is handled simultaneously by the lighting, cooktop, and smoke detector sub-machines.
 
-## Interface
+## Statechart Interface
 
 ```
 in event  motionDetected, motionNotDetected, smokeDetected, smokeNotDetected
@@ -36,30 +30,20 @@ var cooktopTemperature = 0
 var hoodLevel = 0
 ```
 
-## Regions
+## Behavior by Region
 
-**Lights.** From `LightsOff`, `motionDetected` turns them on and 5 s without input
-turns them off. `smokeDetected` moves to `LightOnSmoke` from either state and calls
-`turnLightsOn()`; only `smokeNotDetected` leaves it, so the timeout cannot switch the
-lights off while smoke is present.
+### Lighting Control
+Starting from `LightsOff`, detecting motion (`motionDetected`) switches the lights on, while an inactivity timeout of 5 seconds returns to `LightsOff`. An incoming `smokeDetected` event forces a transition from any state into `LightOnSmoke`, invoking `turnLightsOn()`. This override remains active until `smokeNotDetected` is received, ensuring emergency lighting cannot time out while smoke persists.
 
-**InductionCooktop.** `startCooktop` turns it on; `stopCooktop` and `smokeDetected`
-both turn it off. Inside `CooktopOn`, `cooktopTemperature` rises by 5 every 2 s while
-below 50, then waits 1 s and settles in `CooktopStable`. `removePan` drops it into
-`CooktopCooling`, falling by 5 every 2 s while above 0; `placePan` returns it to
-`CooktopHeating`. The same decay runs as a self-transition on `CooktopOff`, so residual
-heat bleeds away after shutdown.
+### Induction Cooktop
+The appliance turns on via `startCooktop` and powers down upon `stopCooktop` or an emergency `smokeDetected` event. Once active (`CooktopOn`), the internal temperature increases by 5 units every 2 seconds until reaching 50, pauses for 1 second, and transitions to `CooktopStable`. Removing the pan triggers `CooktopCooling`, with temperature dropping every 2 seconds until reaching zero; replacing the pan resumes heating. A complementary decay rule runs as a self-transition in `CooktopOff` to model residual cooling after power-off.
 
-**SmokeDetector.** Two states toggled by `smokeDetected` and `smokeNotDetected`,
-calling `onSmokeDetected()` and `onSmokeDisappear()`. The only region that reports the
-alarm outwards.
+### Smoke Detector
+Toggles between `SmokeDetectorNormal` and `SmokeDetectorAlert` based on `smokeDetected` and `smokeNotDetected`, issuing corresponding calls to `onSmokeDetected()` and `onSmokeDisappear()`.
 
-**KitchenHood.** `vaporDetectedLow` sets `hoodLevel = 1` and enters `KitchenHoodOnLow`,
-`vaporDetectedHigh` sets 2 and enters `KitchenHoodOnHigh`, `vaporCleared` returns to
-`KitchenHoodOff` with 0. The two on-levels switch directly, so the hood steps up or
-down without passing through off.
+### Kitchen Hood
+Modulates extraction intensity according to detected steam: `vaporDetectedLow` sets `hoodLevel = 1` (`KitchenHoodOnLow`), `vaporDetectedHigh` sets `hoodLevel = 2` (`KitchenHoodOnHigh`), and `vaporCleared` resets the unit to `KitchenHoodOff` (`hoodLevel = 0`). Transitions between low and high power occur directly without power cycling through the off state.
 
-## Notes
+## Demonstration
 
-`Registrazione dello schermo 2026-02-19 223158.mp4` is a screen recording kept with the
-project; its contents are not described here.
+A video recording of the state machine execution in itemis CREATE is provided in `Registrazione dello schermo 2026-02-19 223158.mp4`.

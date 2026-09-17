@@ -1,108 +1,94 @@
-# Volvo IT Process Mining
+# Volvo IT Process Mining (BPI Challenge 2013)
 
-Process mining and temporal-logic verification over the BPI Challenge 2013 event
-logs (Volvo IT Belgium, VINST incident and problem management), built with Gradio
-and pm4py.
+Process mining and trace-by-trace temporal logic verification over the Volvo IT Belgium incident and problem management logs (VINST), built with Python, pm4py, flloat, and Gradio.
 
-## Overview
+## What is in this repository
 
-The dashboard discovers process models from the logs, measures how well each
-model matches the recorded behaviour, verifies temporal properties over every
-case, and reports where the time goes. This folder is self-contained: copy it
-anywhere and it runs on its own.
+The project provides an end-to-end pipeline and interactive web interface to analyze the BPI Challenge 2013 dataset:
+- Automated discovery of Petri nets using Alpha, Heuristics, and Inductive miners.
+- Conformance checking across token-based and alignment-based replay (fitness, precision, generalization, simplicity).
+- Formal verification of finite-trace Linear Temporal Logic ($\text{LTL}_f$) properties over all traces, identifying counterexamples and points of failure.
+- Performance and bottleneck analysis (waiting times, case durations, variant Pareto distributions, transition heatmaps).
+- Automated generation of camera-ready LaTeX reports and presentations with exact empirical figures.
 
-### Key features
+## Quickstart
 
-- **Process discovery**: Alpha, Heuristics and Inductive miner, compared side by side
-- **Conformance checking**: fitness, precision, generalisation and simplicity
-- **Temporal verification**: eight shipped properties, or a formula you type,
-  evaluated over finite traces with counterexamples
-- **Performance analysis**: waiting times, case durations, variants, transition heatmap
-- **Assistant**: questions answered from the measured figures of the loaded log,
-  with OpenAI, Gemini or a local Ollama model
-
-## Installation
-
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and Graphviz
-(`sudo apt install graphviz`; pm4py shells out to `dot` to render Petri nets).
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and Graphviz (`sudo apt install graphviz`).
 
 ```bash
+# Setup environment and dependencies
 uv sync --all-extras
-uv run python scripts/fetch_data.py   # downloads the three logs into data/raw/
-uv run pytest                         # 267 tests
-uv run python -m volvo.main           # http://127.0.0.1:7860
+
+# Download raw logs into data/raw/
+uv run python scripts/fetch_data.py
+
+# Run the test suite
+uv run pytest
+
+# Launch the Gradio dashboard
+uv run python -m volvo.main
 ```
 
-API keys are optional and can be passed as flags rather than written to disk:
+The web dashboard opens at `http://127.0.0.1:7860`.
 
+Optional LLM grounding features can be enabled with API keys passed on the command line:
 ```bash
-uv run python -m volvo.main --openai-api-key sk-...   # or --gemini-api-key, --ollama-base-url
-```
-
-## Usage
-
-1. **Data**: pick a log and an activity labelling.
-2. **Preprocessing**: filter by activity, time range or case length, drop
-   duplicates, relabel. Reload from the Data tab to undo.
-3. **Discovery** and **Conformance**: choose a miner, read the Petri net and the
-   four metrics.
-4. **LTL**: run a shipped property or type your own; violating cases come back as
-   counterexamples.
-5. **Analytics**, **Anomalies**, **Prediction**: health score, waiting times,
-   outliers, Markov successor probabilities.
-6. **Report** and **Assistant**: generate the analysis as Markdown, or ask about
-   the loaded log in natural language.
-
-## Project structure
-
-```
-VolvoProcessMining/
-├── volvo/
-│   ├── domain.py          # log schemas and activity-label derivation
-│   ├── logs/              # attribute-preserving loading, filters
-│   ├── mining/            # discovery, conformance, performance
-│   ├── verification/      # temporal-logic encoding and property library
-│   ├── analysis/          # composite score, anomalies, Markov model
-│   ├── ai/                # LLM providers and the grounding fact block
-│   ├── ui/                # Gradio layout, callbacks, figures
-│   ├── reporting/         # Markdown report generation
-│   └── main.py            # command-line entry point
-├── scripts/               # fetch data; regenerate results, figures, tables, PDFs
-├── exercises/             # NuSMV, FSM and statechart coursework
-└── docs/
-    ├── report/documentation.pdf
-    ├── presentation/presentation.pdf
-    └── results/           # measured results for the write-up
+uv run python -m volvo.main --openai-api-key sk-...
+# or --gemini-api-key <key>, --ollama-base-url http://localhost:11434
 ```
 
 ## Dataset
 
-Three logs, all loading to their published counts. BPI 2013 has no activity
-column: the label is derived from Status + Sub Status, and the choice materially
-changes the discovered model.
+The BPI Challenge 2013 dataset contains three event logs from Volvo IT's VINST ticketing system. The raw files lack a single dedicated activity column; activity labels are derived from `Status` and `Sub Status` columns (`status` mode for 4 broad lifecycle stages, or `status_substatus` for 13 fine-grained operational steps).
 
-| Log | Cases | Events | Activities |
+| Log | Cases | Events | Activities (`status_substatus`) |
 |---|---|---|---|
 | Incidents | 7,554 | 65,533 | 13 |
 | Open problems | 819 | 2,351 | 5 |
 | Closed problems | 1,487 | 6,660 | 7 |
 
-## Exercises
+## Project Structure
 
-Three independent coursework exercises under `exercises/`, each with its own
-README: `nusmv/` (symbolic model checking of two puzzles and Peterson's mutual
-exclusion), `fsm/` (a state machine driving an LLM), and `itemis/` (a smart
-kitchen statechart).
+```
+VolvoProcessMining/
+├── volvo/
+│   ├── domain.py          # Schemas and activity-label definitions
+│   ├── logs/              # Ingestion, attribute preservation, filtering
+│   ├── mining/            # Discovery (Alpha/Heuristics/Inductive), replay, metrics
+│   ├── verification/      # LTL_f encoding, property library, flloat verifier
+│   ├── analysis/          # Health scores, anomaly detection, Markov transitions
+│   ├── ai/                # Optional LLM grounding against measured metrics
+│   ├── ui/                # Gradio layout, callbacks, and visualization
+│   ├── reporting/         # Markdown export routines
+│   └── main.py            # CLI entry point
+├── scripts/               # Data fetching, pipeline orchestration, table/PDF compilation
+├── exercises/             # Independent coursework (NuSMV, FSM, itemis statecharts)
+└── docs/
+    ├── report/documentation.pdf     # Full academic report (LaTeX)
+    ├── presentation/presentation.pdf # Beamer presentation slides
+    └── tables/                      # Generated LaTeX tables pinned to code
+```
 
-## Deliverables
+## Reproducing Results and Compiling Documents
 
-`docs/report/documentation.pdf` and `docs/presentation/presentation.pdf`. Every
-table and figure in both is generated from the analysis code, so the documents
-cannot drift from the results. Rebuild them with
-`uv run python scripts/build_all.py`, which needs a LaTeX toolchain
-(`sudo apt install texlive-latex-recommended texlive-fonts-recommended latexmk`).
+To regenerate all figures, empirical LaTeX tables, markdown summaries, and compile both the report and presentation PDFs:
+
+```bash
+uv run python scripts/build_all.py
+```
+
+Compiling the LaTeX documents requires `latexmk` and standard TeX Live packages:
+```bash
+sudo apt install texlive-latex-recommended texlive-fonts-recommended latexmk
+```
+
+## Independent Exercises
+
+Coursework modules in `exercises/` have dedicated documentation:
+- `exercises/nusmv/`: Symbolic model checking with NuSMV (river crossing, Königsberg bridges, and Peterson's mutual exclusion algorithm).
+- `exercises/fsm/`: Deterministic finite state machine orchestrating structured LLM dialogue.
+- `exercises/itemis/`: Concurrent, event-driven smart kitchen statechart in itemis CREATE.
 
 ## Author
 
-**Francesco Sgaramella**
-University of Bari "Aldo Moro"
+Francesco Sgaramella
