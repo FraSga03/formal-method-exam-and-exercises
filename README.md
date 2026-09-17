@@ -6,13 +6,13 @@ Process mining analysis of the BPI Challenge 2013 event logs (Volvo IT Belgium, 
 
 ## Documentation and Deliverables
 
-The main project deliverables (academic report and presentation slides) are in the `docs/` folder:
+The main project deliverables (written report and presentation slides) are in the `docs/` folder:
 
-- **Report (PDF)**: [`docs/report/documentation.pdf`](docs/report/documentation.pdf)
-  - 7-page written report covering process discovery, conformance checking, performance bottlenecks, and temporal verification.
+- **Report**: [`docs/report/documentation.pdf`](docs/report/documentation.pdf)
+  - Analysis covering process discovery, conformance checking, performance bottlenecks, and temporal verification.
   - LaTeX source: [`docs/report/documentation.tex`](docs/report/documentation.tex)
-- **Presentation (PDF)**: [`docs/presentation/presentation.pdf`](docs/presentation/presentation.pdf)
-  - 20-slide presentation deck.
+- **Presentation**: [`docs/presentation/presentation.pdf`](docs/presentation/presentation.pdf)
+  - Slides summarizing the methodology, findings, and architecture.
   - LaTeX Beamer source: [`docs/presentation/presentation.tex`](docs/presentation/presentation.tex)
 - **Generated Tables & Figures**:
   - Raw tables: `docs/tables/`
@@ -51,7 +51,7 @@ uv sync --all-extras
 # Download the BPI Challenge 2013 logs into data/raw/
 uv run python scripts/fetch_data.py
 
-# Run the automated test suite (267 tests)
+# Run tests
 uv run pytest
 
 # Launch the Gradio web dashboard
